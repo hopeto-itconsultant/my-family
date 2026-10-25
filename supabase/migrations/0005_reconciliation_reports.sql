@@ -1,3 +1,4 @@
+
 -- ============================================================================
 -- 0005_reconciliation_reports.sql — Phase 8: bank-statement reconciliation
 -- ----------------------------------------------------------------------------
@@ -41,11 +42,6 @@ create table public.bank_statement_rows (
   matched_at    timestamptz,
   unique (batch_id, txn_date, description, amount_paise, reference)
 );
-
-alter table public.bank_statement_rows
-  add constraint bank_rows_matched_contrib_fk
-  foreign key (matched_id) references public.contributions (id)
-  where matched_kind = 'contribution';
 
 create index statement_rows_date_idx on public.bank_statement_rows (txn_date desc);
 create index statement_rows_unmatched_idx on public.bank_statement_rows (matched_id)
@@ -221,3 +217,5 @@ to authenticated;
 
 -- Audit-log visibility for statement actions follows the same leader-only
 -- read policy from 0001; no new policies needed.
+
+
