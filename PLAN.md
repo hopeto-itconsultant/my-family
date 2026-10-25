@@ -151,3 +151,16 @@ Or create the repo first on GitHub ("New repository" → *don't* initialize with
 - No online payment collection/gateway integration (manual bank/UPI recording only, as specified).
 - No invented "real" transactions — sample rows are labeled prototype data.
 - No multi-family tenancy; single family instance keeps RLS simple.
+
+## Phase 10 — Mobile-number login ✅ built
+- Migration `0007_phone_login.sql`: `normalize_phone()` (last 10 digits, +91 canonical),
+  generated unique `phone_normalized` column, shadow-email resolver
+  (`OFH-<phone>@phone.invalid`, RFC-reserved undeliverable domain), triggers to keep
+  `auth.users.email` in sync for phone accounts only, and an audit entry on every
+  phone change (login identifier changes are sensitive).
+- `/login` defaults to **📱 Mobile number** with a secondary ✉️ Email tab (email-invited
+  members keep working). Server Action resolves the phone via the DB helper, then signs
+  in; unknown numbers get the same generic error as a wrong password — no enumeration.
+- Profile editor: mobile number is now labeled as the sign-in credential, validated to
+  10 digits, duplicates rejected by the unique index with a friendly message.
+- Runbook updated with phone-only account creation SQL (no real email required).
