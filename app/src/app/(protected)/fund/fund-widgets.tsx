@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useOnline } from '@/components/pwa';
 import {
   recordPayment, withdrawDeclaration, verifyContribution, rejectContribution,
   reverseContribution, approveExpense, rejectExpense, reverseExpense, payExpense,
@@ -50,6 +51,7 @@ export function RecordPaymentSheet() {
   const [note, setNote] = useState('');
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, start] = useTransition();
+  const online = useOnline();
 
   const monthRef = new Date().toISOString().slice(0, 7); // YYYY-MM (UTC ok for monthly pledge bucket)
 
@@ -98,7 +100,7 @@ export function RecordPaymentSheet() {
             placeholder="Note (optional)" className={inputCls} />
           <ErrorNote result={result} />
           {result?.ok && <p className="text-sm text-teal-700">Saved as pending ✓ awaiting treasurer verification.</p>}
-          <button onClick={submit} disabled={amount.trim() === '' || isPending}
+          <button onClick={submit} disabled={!online || amount.trim() === '' || isPending}
             className="w-full rounded-xl bg-teal-700 text-white py-3 font-semibold disabled:opacity-40">
             {isPending ? 'Saving…' : 'Save as pending'}
           </button>
@@ -117,6 +119,7 @@ export function VerifyControls({ c, names }: { c: Contribution; names: Record<st
   const [field, setField] = useState('');
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, start] = useTransition();
+  const online = useOnline();
 
   const label = c.status === 'verified' ? 'Reverse verified payment'
     : c.status === 'rejected' ? null : 'Review payment';
@@ -158,7 +161,7 @@ export function VerifyControls({ c, names }: { c: Contribution; names: Record<st
             Only verify after seeing the money in the actual bank/UPI statement. This action is audited.
           </p>
           <ErrorNote result={result} />
-          <button onClick={submit} disabled={field.trim().length < 3 || isPending}
+          <button onClick={submit} disabled={!online || field.trim().length < 3 || isPending}
             className="w-full rounded-xl bg-stone-800 text-white py-3 font-semibold disabled:opacity-40">
             {isPending ? 'Working…' : mode === 'verify' ? 'Confirm received' : mode === 'reject' ? 'Reject payment' : 'Record reversal'}
           </button>
@@ -189,6 +192,7 @@ export function ExpenseRequestSheet() {
   const [amount, setAmount] = useState('');
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, start] = useTransition();
+  const online = useOnline();
 
   function submit() {
     setResult(null);
@@ -210,7 +214,7 @@ export function ExpenseRequestSheet() {
           <textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={2} maxLength={600} placeholder="Purpose / justification" className={inputCls} />
           <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="Amount ₹" className={inputCls} />
           <ErrorNote result={result} />
-          <button onClick={submit} disabled={!title.trim() || !amount.trim() || isPending}
+          <button onClick={submit} disabled={!online || !title.trim() || !amount.trim() || isPending}
             className="w-full rounded-xl bg-teal-700 text-white py-3 font-semibold disabled:opacity-40">
             {isPending ? 'Submitting…' : 'Submit for approval'}
           </button>
@@ -227,6 +231,7 @@ export function ExpenseControls({ e, names, receiptUrl }: { e: Expense; names: R
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, start] = useTransition();
+  const online = useOnline();
 
   function openAs(m: typeof mode) { setMode(m); setField(''); setFile(null); setResult(null); setOpen(true); }
 
@@ -276,7 +281,7 @@ export function ExpenseControls({ e, names, receiptUrl }: { e: Expense; names: R
           )}
           <ErrorNote result={result} />
           <button onClick={submit}
-            disabled={(mode !== 'approve') && field.trim().length < 3}
+            disabled={!online || ((mode !== 'approve') && field.trim().length < 3)}
             className="w-full rounded-xl bg-stone-800 text-white py-3 font-semibold disabled:opacity-40">
             {isPending ? 'Working…' : mode === 'approve' ? 'Approve request' : mode === 'reject' ? 'Reject' : mode === 'pay' ? 'Mark paid' : 'Record reversal'}
           </button>

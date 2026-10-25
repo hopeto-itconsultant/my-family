@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useOnline } from '@/components/pwa';
 import { addAchievement, type ActionResult } from '@/app/actions/prayers';
 
 interface PersonOption {
@@ -28,6 +29,7 @@ export function AchievementSheet({ people, selfId }: { people: PersonOption[]; s
   const [achievedOn, setAchievedOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const online = useOnline();
 
   const sortedPeople = useMemo(
     () => [...people].sort((x, y) => x.name.localeCompare(y.name)),
@@ -122,7 +124,7 @@ export function AchievementSheet({ people, selfId }: { people: PersonOption[]; s
             {result?.ok && <p className="text-sm text-teal-700">Celebrated 🎉</p>}
             <button
               onClick={submit}
-              disabled={!canSubmit}
+              disabled={!online || !canSubmit}
               className="w-full rounded-xl bg-amber-500 text-white py-3 font-semibold disabled:opacity-40"
             >
               {isPending ? 'Saving…' : 'Add achievement'}

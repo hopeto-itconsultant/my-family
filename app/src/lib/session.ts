@@ -73,3 +73,31 @@ export async function getUpcomingEvents(days = 45): Promise<FamilyEvent[]> {
   if (error || !data) return [];
   return data as FamilyEvent[];
 }
+
+/** In-app reminders for the signed-in member (RLS: only own rows are visible). */
+export type AppNotification = {
+  id: string;
+  kind: 'event' | 'fund' | 'system';
+  title: string;
+  body: string | null;
+  link: string | null;
+  created_at: string;
+  read_at: string | null;
+};
+
+export async function getMyNotifications(limit = 12): Promise<AppNotification[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, kind, title, body, link, created_at, read_at')
+    .eq('user_id', user.id)
+    .is('read_at', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data as AppNotification[];
+}

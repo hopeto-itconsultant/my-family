@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useOnline } from '@/components/pwa';
 import { createEvent, type ActionResult } from '@/app/actions/events';
 import type { EventKind } from '@/lib/types';
 
@@ -30,6 +31,7 @@ export function AddEventSheet({ people, branches }: { people: PersonOption[]; br
   const [venue, setVenue] = useState('');
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const online = useOnline();
 
   const sortedPeople = useMemo(
     () => [...people].sort((x, y) => x.name.localeCompare(y.name)),
@@ -187,7 +189,7 @@ export function AddEventSheet({ people, branches }: { people: PersonOption[]; br
 
             <button
               onClick={submit}
-              disabled={!canSubmit}
+              disabled={!online || !canSubmit}
               className="w-full rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white shadow-sm disabled:opacity-40 active:scale-[0.99] transition"
             >
               {isPending ? 'Saving…' : 'Save event'}

@@ -80,7 +80,12 @@ export default async function FundPage() {
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto space-y-5">
-      <h1 className="text-xl font-bold">💛 Mission Fund</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">💛 Mission Fund</h1>
+        <Link href="/reports" className="text-xs font-semibold text-teal-700 ring-1 ring-teal-200 bg-teal-50 rounded-lg px-2.5 py-1.5">
+          📊 Monthly report
+        </Link>
+      </div>
 
       {/* Verified balance hero */}
       <section className="rounded-3xl bg-teal-800 text-white p-5 shadow-lg">

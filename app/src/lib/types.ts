@@ -173,6 +173,52 @@ export interface AuditRow {
   detail: Record<string, unknown>;
 }
 
+// ---- Phase 8: bank reconciliation ------------------------------------------
+export interface StatementBatch {
+  id: string;
+  label: string;
+  imported_by: string;
+  imported_at: string;
+  row_count: number;
+}
+
+export interface StatementRowView {
+  id: string;
+  batch_id: string;
+  txn_date: string; // YYYY-MM-DD
+  description: string;
+  reference: string | null;
+  amount_paise: number; // signed: + credit (money in), − debit (money out)
+  matched_kind: 'contribution' | 'expense' | null;
+  matched_id: string | null;
+  matched_at: string | null;
+  statement_batches: { label: string } | null;
+}
+
+/** A verified contribution or paid expense offered as a match candidate. */
+export interface LedgerCandidate {
+  kind: 'contribution' | 'expense';
+  id: string;
+  label: string;
+  sub: string;
+  amount_paise: number;
+  occurred_at: string;
+  direction: 'in' | 'out';
+}
+
+/** Output of reconcile_as_of() — all values integer paise. */
+export interface ReconcileReport {
+  bank_in_paise: number;
+  bank_out_paise: number;
+  bank_net_paise: number;
+  ledger_verified_in_paise: number;
+  ledger_paid_out_paise: number;
+  ledger_balance_paise: number;
+  diff_in_paise: number;
+  diff_out_paise: number;
+  unmatched_bank_rows: number;
+}
+
 export const ROLE_LABELS: Record<FamilyRole, string> = {
   member: 'Member',
   coordinator: 'Coordinator',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useOnline } from '@/components/pwa';
 import { submitPrayer, markPrayerAnswered, type ActionResult } from '@/app/actions/prayers';
 
 /** Bottom-sheet: post a prayer request (public to family, or private). */
@@ -11,6 +12,7 @@ export function PrayerSheet() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const online = useOnline();
 
   const canSubmit = title.trim().length >= 2 && !isPending;
 
@@ -77,7 +79,7 @@ export function PrayerSheet() {
             {result?.ok && <p className="text-sm text-teal-700">Saved 🙏</p>}
             <button
               onClick={submit}
-              disabled={!canSubmit}
+              disabled={!online || !canSubmit}
               className="w-full rounded-xl bg-teal-700 text-white py-3 font-semibold disabled:opacity-40"
             >
               {isPending ? 'Saving…' : 'Post request'}
@@ -94,6 +96,7 @@ export function AnswerPrayerButton({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState('');
   const [isPending, startTransition] = useTransition();
+  const online = useOnline();
 
   if (!editing) {
     return (
@@ -117,7 +120,7 @@ export function AnswerPrayerButton({ id }: { id: string }) {
       />
       <div className="flex gap-2">
         <button
-          disabled={isPending}
+          disabled={!online || isPending}
           onClick={() =>
             startTransition(async () => {
               const res = await markPrayerAnswered(id, note);

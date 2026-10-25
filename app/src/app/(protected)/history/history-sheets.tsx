@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useOnline } from '@/components/pwa';
 import { addHistoryEntry, uploadPhoto, addAsset, type ActionResult } from '@/app/actions/history';
 
 type Tab = 'story' | 'photo' | 'asset';
@@ -18,6 +19,7 @@ export function HistorySheets({
   const [tab, setTab] = useState<Tab>('story');
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const online = useOnline();
 
   // story fields
   const [title, setTitle] = useState('');
@@ -169,7 +171,7 @@ export function HistorySheets({
             {result?.ok && <p className="text-sm text-teal-700">Saved ✓</p>}
             <button
               onClick={submit}
-              disabled={!ready || isPending}
+              disabled={!online || !ready || isPending}
               className="w-full rounded-xl bg-teal-700 text-white py-3 font-semibold disabled:opacity-40"
             >
               {isPending ? 'Saving…' : 'Save'}

@@ -88,8 +88,8 @@ These are **release blockers**, not nice-to-haves:
 | **4 ✅ built (`/app`)** | Prayer requests + achievements: post, mark answered/answered-elsewhere, close, admin soft-hiding with reason, audit trail | `/prayers` over `0003_prayers_history.sql` |
 | **5 ✅ built (`/app`)** | Family history stories, photo albums, vehicles & assets register | `/history`; private Storage buckets `family-photos`/`receipts` created by migration; signed URLs re-minted per page load |
 | **6+7 ✅ built (`/app`)** | **Mission Fund MVP + expenses** (prototype ported to Next.js): contribution lifecycle declared → pending_verification → verified/rejected (+reversal), manual bank/UPI recording, treasurer verification with bank ref, expense submit → approve → pay-with-receipt, append-only audit view, branch collection progress, verified-only balance invariant | `/fund` + `actions/fund.ts` over `0004_mission_fund.sql`; monthly/P&L report export deferred to Phase 8 |
-| 8 | Reconciliation | Bank statement CSV import, matching UI, discrepancy report |
-| 9 | PWA hardening + rollout | Offline read cache, install prompts, family onboarding docs |
+| **8 ✅ built** | Reconciliation + reports | Bank CSV import (validated parser), match/unmatch with ledger suggestions, explanation labels for unmatched rows, monthly statement & P&L print/PDF (`/reconcile`, `/reports`) over `0005_reconciliation_reports.sql` |
+| **9 ✅ built** | PWA hardening + rollout | Service worker (`public/sw.js`: Supabase API never cached; app shell network-first offline fallback), install prompt + iOS hint (`components/pwa.tsx`), offline mutation guards across all forms, in-app reminders (`0006_notifications.sql` nightly job → 🔔 bell + `/notifications`), ops runbook `docs/ONBOARDING.md` |
 
 Each phase ships behind real RLS; the prototype's mock data (`src/data/mockData.ts`) is clearly labeled illustrative and must **never be seeded into production**.
 
