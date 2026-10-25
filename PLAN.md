@@ -81,8 +81,9 @@ These are **release blockers**, not nice-to-haves:
 | Phase | Scope | Deliverable |
 |---|---|---|
 | **0 ✅ done here** | Mission Fund dashboard prototype (this repo) | Interactive UI spec for flows, states, roles |
-| 1 | Repo scaffold: Next.js + TS + Tailwind + Supabase project, CI, preview deploys | Login/logout, `profiles` bootstrap, invite-only sign-up |
-| 2 | Directory + family tree + branches | Tree view, member cards, search |
+| **1 ✅ built (`/app`)** | Repo scaffold: Next.js 16 + TS + Tailwind v4 + Supabase SSR clients, middleware auth gate, login/logout, invite-only sign-up, first-user-becomes-admin trigger, PWA manifest + icons, `/setup` guide | Working app shell wired to `supabase/migrations/0001_init.sql` |
+| **2a ✅ built (`/app`)** | Member directory + branches (search, branch grouping, self-profile edit) | `/directory`, `/home` pages over RLS-protected `profiles` |
+| 2b | Family tree edges (parent/child relations) + tree visualisation | Phase 2 follow-up |
 | 3 | Birthdays/anniversaries/meetups | Calendar feed, reminders (Edge Function + email) |
 | 4 | Prayer requests + achievements | Posting, gentle moderation |
 | 5 | History, photos, vehicles, assets | Private Storage galleries, timeline |
