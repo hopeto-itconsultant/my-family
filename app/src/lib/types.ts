@@ -22,6 +22,30 @@ export interface ProfileWithBranch extends Profile {
   branches: { id: string; name: string } | null;
 }
 
+export type RelationKind = 'parent' | 'spouse' | 'sibling';
+
+/** Row of public.family_relations. For kind='parent': from = child, to = parent. */
+export interface FamilyRelation {
+  id: string;
+  from_member: string;
+  to_member: string;
+  kind: RelationKind;
+}
+
+export type EventKind = 'birthday' | 'anniversary' | 'meetup';
+
+/** Row of public.events (with joined names resolved client-side). */
+export interface FamilyEvent {
+  id: string;
+  kind: EventKind;
+  title: string;
+  occurs_on: string; // ISO date (YYYY-MM-DD)
+  member_id: string | null;
+  branch_id: string | null;
+  venue: string | null;
+  notes: string | null;
+}
+
 export const ROLE_LABELS: Record<FamilyRole, string> = {
   member: 'Member',
   coordinator: 'Coordinator',

@@ -18,8 +18,9 @@ export default async function HomePage() {
 
       <section aria-label="Features" className="grid grid-cols-2 gap-3">
         <FeatureCard href="/directory" icon="👪" title="Family directory" desc="All relatives & branches" ready />
+        <FeatureCard href="/tree" icon="🌳" title="Family tree" desc="Generations & relations" ready />
         <FeatureCard href="/fund" icon="💛" title="Mission Fund" desc="Contributions, balance, audit" ready />
-        <FeatureCard href="/events" icon="🎂" title="Birthdays & meetups" desc="Coming in Phase 3" />
+        <FeatureCard href="/events" icon="🎂" title="Birthdays & meetups" desc="Next 60 days" ready />
         <FeatureCard href="/prayers" icon="🙏" title="Prayers & achievements" desc="Coming in Phase 4" />
         <FeatureCard href="/history" icon="📜" title="History & photos" desc="Coming in Phase 5" />
         <FeatureCard href="/home" icon="🙂" title="My profile" desc="Name, phone, role" ready />

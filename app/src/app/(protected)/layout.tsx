@@ -6,6 +6,7 @@ import { ROLE_LABELS } from '@/lib/types';
 const TABS = [
   { href: '/', label: 'Home', icon: '🏠' },
   { href: '/directory', label: 'Family', icon: '👪' },
+  { href: '/events', label: 'Events', icon: '🎂' },
   { href: '/fund', label: 'Mission Fund', icon: '💛' },
   { href: '/home', label: 'Me', icon: '🙂' },
 ];
@@ -32,7 +33,7 @@ export default async function ProtectedLayout({
 
       <nav
         aria-label="Primary"
-        className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-stone-200 grid grid-cols-4 pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-stone-200 grid grid-cols-5 pb-[env(safe-area-inset-bottom)]"
       >
         {TABS.map((t) => (
           <Link
