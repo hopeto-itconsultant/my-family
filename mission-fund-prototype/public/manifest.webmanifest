@@ -1,0 +1,13 @@
+{
+  "name": "Our Family Home — Mission Fund",
+  "short_name": "Family Home",
+  "description": "Private family community app: contributions, expenses and audit trail for the Mission Fund.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#047857",
+  "icons": [
+    { "src": "/icons/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
