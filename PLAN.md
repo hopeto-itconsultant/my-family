@@ -85,10 +85,9 @@ These are **release blockers**, not nice-to-haves:
 | **2a ✅ built (`/app`)** | Member directory + branches (search, branch grouping, self-profile edit) | `/directory`, `/home` pages over RLS-protected `profiles` |
 | **2b ✅ built (`/app`)** | Family tree edges (parent/spouse/sibling) + generation view, cycle detection, coordinator-only "Link relatives" sheet | `/tree` over `0002_tree_events.sql` (`family_relations`, pure engine in `src/lib/tree.ts` with unit tests) |
 | **3 ✅ built (`/app`)** | Birthdays/anniversaries/meetups: month-grouped 60-day feed, add-event sheet (members may self-add birthdays only), `roll_forward_events()` for recurring dates | `/events`; email reminders deferred to Phase 9 (needs SMTP secrets + cron) |
-| 4 | Prayer requests + achievements | Posting, gentle moderation |
-| 5 | History, photos, vehicles, assets | Private Storage galleries, timeline |
-| 6 | **Mission Fund MVP** (port this prototype) | Contributions lifecycle, treasurer verification, audit log, balance views |
-| 7 | Expenses + receipts + approvals | Approval workflow, receipt upload, financial reports (monthly/P&L-style) |
+| **4 ✅ built (`/app`)** | Prayer requests + achievements: post, mark answered/answered-elsewhere, close, admin soft-hiding with reason, audit trail | `/prayers` over `0003_prayers_history.sql` |
+| **5 ✅ built (`/app`)** | Family history stories, photo albums, vehicles & assets register | `/history`; private Storage buckets `family-photos`/`receipts` created by migration; signed URLs re-minted per page load |
+| **6+7 ✅ built (`/app`)** | **Mission Fund MVP + expenses** (prototype ported to Next.js): contribution lifecycle declared → pending_verification → verified/rejected (+reversal), manual bank/UPI recording, treasurer verification with bank ref, expense submit → approve → pay-with-receipt, append-only audit view, branch collection progress, verified-only balance invariant | `/fund` + `actions/fund.ts` over `0004_mission_fund.sql`; monthly/P&L report export deferred to Phase 8 |
 | 8 | Reconciliation | Bank statement CSV import, matching UI, discrepancy report |
 | 9 | PWA hardening + rollout | Offline read cache, install prompts, family onboarding docs |
 
