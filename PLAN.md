@@ -83,8 +83,8 @@ These are **release blockers**, not nice-to-haves:
 | **0 ✅ done here** | Mission Fund dashboard prototype (this repo) | Interactive UI spec for flows, states, roles |
 | **1 ✅ built (`/app`)** | Repo scaffold: Next.js 16 + TS + Tailwind v4 + Supabase SSR clients, middleware auth gate, login/logout, invite-only sign-up, first-user-becomes-admin trigger, PWA manifest + icons, `/setup` guide | Working app shell wired to `supabase/migrations/0001_init.sql` |
 | **2a ✅ built (`/app`)** | Member directory + branches (search, branch grouping, self-profile edit) | `/directory`, `/home` pages over RLS-protected `profiles` |
-| 2b | Family tree edges (parent/child relations) + tree visualisation | Phase 2 follow-up |
-| 3 | Birthdays/anniversaries/meetups | Calendar feed, reminders (Edge Function + email) |
+| **2b ✅ built (`/app`)** | Family tree edges (parent/spouse/sibling) + generation view, cycle detection, coordinator-only "Link relatives" sheet | `/tree` over `0002_tree_events.sql` (`family_relations`, pure engine in `src/lib/tree.ts` with unit tests) |
+| **3 ✅ built (`/app`)** | Birthdays/anniversaries/meetups: month-grouped 60-day feed, add-event sheet (members may self-add birthdays only), `roll_forward_events()` for recurring dates | `/events`; email reminders deferred to Phase 9 (needs SMTP secrets + cron) |
 | 4 | Prayer requests + achievements | Posting, gentle moderation |
 | 5 | History, photos, vehicles, assets | Private Storage galleries, timeline |
 | 6 | **Mission Fund MVP** (port this prototype) | Contributions lifecycle, treasurer verification, audit log, balance views |
