@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -168,7 +168,7 @@ export async function createMember(
   });
 
   revalidatePath('/directory');
-  revalidateTag('directory');
+  updateTag('directory');
   revalidatePath('/members');
   redirect('/members?created=1');
 }
@@ -224,6 +224,7 @@ export async function updateMember(
     };
   }
 
+  const admin = createAdminClient();
   await admin.rpc('log_audit', {
     p_actor: ctx.actorId,
     p_action: 'member.update',
@@ -233,7 +234,7 @@ export async function updateMember(
   });
 
   revalidatePath('/directory');
-  revalidateTag('directory');
+  updateTag('directory');
   revalidatePath('/members');
   redirect(`/members/${id}?saved=1`);
 }

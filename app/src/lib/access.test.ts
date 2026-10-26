@@ -43,7 +43,7 @@ test('sortUnits puts family-wide first, then branches, then groups alphabeticall
     { scope: 'family', kind: 'group', name: 'Shared Family' },
     { scope: 'branch', kind: 'branch', name: 'Patel side' },
     { scope: 'branch', kind: 'branch', name: 'Ahmed side' },
-  ];
+  ] as const;
   assert.deepEqual(sortUnits(units).map((u) => u.name), [
     'Shared Family', 'Ahmed side', 'Patel side', 'Zebra Committee',
   ]);

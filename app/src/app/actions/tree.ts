@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, canManage } from '@/lib/session';
 import type { RelationKind } from '@/lib/types';
@@ -50,7 +50,7 @@ export async function addRelation(input: {
     return { ok: false, error: 'Could not save the relation (permission or validation).' };
   }
   revalidatePath('/tree');
-  revalidateTag('tree');
+  updateTag('tree');
   return { ok: true };
 }
 
@@ -61,6 +61,6 @@ export async function deleteRelation(id: string): Promise<ActionResult> {
   const { error } = await supabase.from('family_relations').delete().eq('id', id);
   if (error) return { ok: false, error: 'Could not remove the relation.' };
   revalidatePath('/tree');
-  revalidateTag('tree');
+  updateTag('tree');
   return { ok: true };
 }

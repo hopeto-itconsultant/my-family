@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, canManage } from '@/lib/session';
 import type { EventKind } from '@/lib/types';
@@ -48,7 +48,7 @@ export async function createEvent(input: {
     return { ok: false, error: 'Could not save the event (permission or validation).' };
   }
   revalidatePath('/events');
-  revalidateTag('events');
+  updateTag('events');
   revalidatePath('/');
   return { ok: true };
 }
@@ -68,7 +68,7 @@ export async function deleteEvent(id: string): Promise<ActionResult> {
   const { error } = await supabase.from('events').delete().eq('id', id);
   if (error) return { ok: false, error: 'Could not remove the event.' };
   revalidatePath('/events');
-  revalidateTag('events');
+  updateTag('events');
   revalidatePath('/');
   return { ok: true };
 }

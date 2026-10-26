@@ -38,25 +38,25 @@ export async function requireProfile(): Promise<Profile> {
   return profile;
 }
 
-/** Directory — served via the short route cache (lib/cached); writes call
- * revalidatePath('/directory'|'/members'), so edits appear immediately. */
+/** Directory — per-request only. The cookie session cannot be read inside
+ * `unstable_cache`, and RLS makes the rows user-scoped. */
 export async function getDirectory(): Promise<ProfileWithBranch[]> {
   return getCachedDirectory();
 }
 
-/** All family branches (route-cached ~10 min; branch names change rarely). */
+/** All family branches visible to this member (per-request). */
 export async function getBranches(): Promise<Branch[]> {
   return getCachedBranches();
 }
 
-/** Relation edges — route-cached ~2 min; tree actions revalidatePath('/tree'). */
+/** Relation edges for this member (per-request). */
 export async function getRelations(): Promise<FamilyRelation[]> {
-  return getCachedRelations() as Promise<FamilyRelation[]>;
+  return getCachedRelations();
 }
 
-/** Upcoming events window — route-cached ~5 min; event actions revalidate. */
+/** Upcoming events window for this member (per-request). */
 export async function getUpcomingEvents(days = 45): Promise<FamilyEvent[]> {
-  return getCachedUpcomingEvents(days) as Promise<FamilyEvent[]>;
+  return getCachedUpcomingEvents(days);
 }
 
 /** In-app reminders for the signed-in member (RLS: only own rows are visible). */

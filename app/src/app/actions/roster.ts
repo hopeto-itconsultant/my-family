@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdminCtx } from './members';
@@ -175,8 +175,8 @@ export async function importRoster(rows: ParsedRosterRow[], branchId: string | n
   });
 
   revalidatePath('/directory');
-  revalidateTag('directory');
-  revalidateTag('events');
+  updateTag('directory');
+  updateTag('events');
   revalidatePath('/members');
   revalidatePath('/events');
   return { created: created.length, skipped, errors };

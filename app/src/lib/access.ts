@@ -64,7 +64,7 @@ export function canManageMemberships(myRole: MembershipRole | null, myStatus: Me
 }
 
 /** Sort units for the switcher: family-wide first, then branches, then groups. */
-export function sortUnits<T extends { scope: UnitScope; kind: UnitKind; name: string }>(units: T[]): T[] {
+export function sortUnits<T extends { scope: UnitScope; kind: UnitKind; name: string }>(units: readonly T[]): T[] {
   const rank = (u: T) => (u.scope === 'family' ? 0 : u.kind === 'branch' ? 1 : 2);
   return [...units].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 }
