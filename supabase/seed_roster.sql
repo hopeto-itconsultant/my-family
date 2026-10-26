@@ -313,11 +313,22 @@ where not exists (
 
 commit;
 
--- Audit note (append-only log; actor resolved as whoever runs the script if present)
-insert into public.audit_log (actor_id, action, entity, entity_id, details)
-select coalesce((select id from public.profiles where role = 'admin' limit 1), (select id from public.profiles limit 1)),
-       'roster.import_sql', 'profiles', null,
-       jsonb_build_object('sheet', 'birthdays-oct-2026', 'with_phone', 20, 'directory_only', 11,
-                          'phone_fixes', jsonb_build_object('Akitoli', '8787438094', 'Mekua', '8787837993'))
-where not exists (select 1 from public.profiles); -- placeholder guard replaced below
--- (Re-run safe: remove the WHERE clause above if you want every execution logged.)
+-- Audit note (append-only log via the SECURITY DEFINER helper from 0001).
+-- entity_id is NOT NULL by schema, so we use a batch tag. Logged on every run.
+select public.log_audit(
+  (select id from public.profiles where role = 'admin' order by created_at limit 1),
+  'roster.import_sql', 'profiles', 'birthdays-oct-2026',
+  jsonb_build_object('with_phone', 20, 'directory_only', 11,
+                     'phone_fixes', jsonb_build_object('Akitoli', '8787438094', 'Mekua', '8787837993'))
+);
+
+-- Verification query (run after commit; expect 31 total new rows):
+-- select count(*) filter (where phone_normalized is not null)     as with_login,
+--        count(*) filter (where phone_normalized is null)         as directory_only,
+--        count(*)                                                 as roster_total
+--   from public.profiles
+--  where full_name in ('Akitoli','Debu','Deepshika Dorothy Roy','Eshan Vikibe','Ethan',
+--                       'Hilomu','Hokato','Hopeto','Inakali','Juni','Kaliho','Kito','Kughato',
+--                       'Livito','Loinoli','Mary','Mekua','Mughatoli','Ngukavi','Nikali',
+--                       'Nikupu / Kurpu','Nilimi','Nipu','Saurabh','Shikatoli','Sumsa','Tili',
+--                       'Tonu','Tunakali','Vibo','Vikheshe');
