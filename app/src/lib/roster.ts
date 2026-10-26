@@ -8,8 +8,8 @@ import { normalizePhone } from './phone';
 export interface ParsedRosterRow {
   full_name: string;
   nicknames: string[] | null;
-  phone: string |            // canonical '91XXXXXXXXXX'
-    | null;                  // when the sheet had no usable number
+  phone: string | null;      // canonical '91XXXXXXXXXX', or null when the
+                             // sheet had no usable number (directory-only)
   birth_date: string | null;      // 'YYYY-MM-DD' when the year is known
   birth_year: number | null;      // recorded separately (migration 0010)
   birthday_hint: string | null;   // 'MM-DD' when only day+month are known

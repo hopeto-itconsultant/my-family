@@ -27,9 +27,7 @@ export async function requireAdminCtx() {
   return { supabase, actorId: user.id };
 }
 
-async function requireAdmin() {
-  return requireAdminCtx();
-}
+const requireAdmin = requireAdminCtx;
 
 /** Shared extraction/validation of the new profile fields (migration 0010). */
 function readLifeFields(formData: FormData): {
@@ -63,23 +61,6 @@ function readLifeFields(formData: FormData): {
 }
 
 const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'coordinator', 'treasurer', 'admin'];
-
-/** Only an admin may manage accounts. Checked against the DB row (source of
- *  truth), not just the JWT claim. */
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: me } = await supabase
-    .from('profiles')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .single();
-  if (!me || me.role !== 'admin') return null;
-  return { supabase, actorId: user.id };
-}
 
 function validDate(s: string): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
