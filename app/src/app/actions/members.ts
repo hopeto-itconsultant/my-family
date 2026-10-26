@@ -60,7 +60,7 @@ function readLifeFields(formData: FormData): {
   return { nicknames: nicknames.length ? nicknames : null, birthDate, birthYear, dateOfDeath };
 }
 
-// Coordinator was merged into Treasurer (migration 0013): one steward role
+// Coordinator was merged into Treasurer (migration 0015): one steward role
 // manages the family app AND records all Mission Fund entries manually.
 const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
 
@@ -195,7 +195,7 @@ export async function updateMember(
     return { ok: false, error: 'Phone must be a 10-digit mobile number.' };
   if (!ASSIGNABLE_ROLES.includes(role)) return { ok: false, error: 'Invalid role.' };
 
-  // Multiple treasurers/stewards are allowed since migration 0013
+  // Multiple treasurers/stewards are allowed since migration 0015
   // (coordinator merged into treasurer); every role change is audited by the
   // profile trigger, so no app-level single-treasurer guard is needed here.
 

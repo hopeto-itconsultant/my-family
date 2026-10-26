@@ -7,13 +7,13 @@ Awaiting approval before Phase 2 (which introduces additive migrations).
 
 ## 1. What exists today (verified by inspection)
 
-### Database (`supabase/migrations/0001…0013`, 12 files, ~2,241 lines)
+### Database (`supabase/migrations/0001…0015`, roster import is `0014_roster_import.sql`, coordinator merge is `0015_merge_coordinator_into_treasurer.sql`)
 | Area | Current model | Limitation vs. the new requirement |
 |---|---|---|
-| Identity | `profiles` (1 row per auth user), phone-login shadow email (0007) | ✅ reuse as-is; no duplicate identities needed |
+| Identity | `profiles` (1 row per auth user), phone-login shadow email (`0010_phone_login.sql`) | ✅ reuse as-is; no duplicate identities needed |
 | Branches | `branches` table; **one nullable `profiles.branch_id`** = exactly one branch per person | Cannot express "my branch + wife's branch" memberships |
-| Roles | Global enum `family_role` on profiles: `member \| treasurer \| admin` (coordinator merged into treasurer in 0013); mirrored into JWT via `app_metadata.role`; helpers `jwt_role()`, `is_treasurer()`, `is_steward()` | One global role only; not scoped to a branch/division/fund; no Viewer/Editor/Contributor granularity |
-| Mission Fund | Single shared ledger: `contributions`, `expenses` (0004). **No fund_id column.** Read policies are `using (true)` (whole family sees everything — per earlier decision). All writes funnel through SECURITY DEFINER transition functions gated by `is_treasurer()`; exactly-one-treasurer enforced by partial unique index (0008) | Cannot have Branch-A fund vs. Shared fund; cannot give one person access to one fund only; treasurer authority is global, not per-fund |
+| Roles | Global enum `family_role` on profiles: `member \| treasurer \| admin` (coordinator merged into treasurer in `0015_merge_coordinator_into_treasurer.sql`); mirrored into JWT via `app_metadata.role`; helpers `jwt_role()`, `is_treasurer()`, `is_steward()` | One global role only; not scoped to a branch/division/fund; no Viewer/Editor/Contributor granularity |
+| Mission Fund | Single shared ledger: `contributions`, `expenses` (0004). **No fund_id column.** Read policies are `using (true)` (whole family sees everything — per earlier decision). All writes funnel through SECURITY DEFINER transition functions gated by `is_treasurer()`; exactly-one-treasurer enforced by partial unique index (`0011_treasurer_only_fund.sql`) | Cannot have Branch-A fund vs. Shared fund; cannot give one person access to one fund only; treasurer authority is global, not per-fund |
 | Other resources | `events`, `prayer_requests` (has `is_private` flag → owner-only), `achievements`, `history_entries`, `photos`, `family_assets` (0002–0003). Reads mostly `using (true)`; writes steward-or-owner | No audience selection (branch/group/shared); no per-resource grants |
 | Audit | Append-only `audit_log` (REVOKE UPDATE/DELETE; `log_audit()` helper) | Reusable as-is for membership/permission change history |
 | Storage | Private buckets `family-photos`, `receipts`; signed URLs minted server-side after an RLS pass on metadata rows | Metadata rows will inherit resource ACLs; bucket policies unchanged |
@@ -99,10 +99,10 @@ Authors pick an audience (me / selected members / group / branch / selected bran
 ---
 
 ## 7. Migration plan (non-destructive, reversible)
-1. **0014_org_units.sql** — create `org_units`, backfill from `branches` (kind='branch') + a 'shared_family' unit; add `unit_memberships`, backfill from `profiles.branch_id` (role='administrator' ← current stewards? no: role='member'/viewer baseline; admins assigned explicitly). `profiles.branch_id` kept as a deprecated mirror for one release (compat).
-2. **0015_resource_access.sql** — grant tables + `can_access()`/`visible_unit_ids()` helpers + audit triggers; convert current `using(true)` reads into explicit grants.
-3. **0016_funds.sql** — `mission_funds`, seed Family Mission Fund, add `fund_id` with backfill, rewrite fund policies/functions to scoped checks. *(first breaking-behavior step — needs explicit approval)*
-4. **0017_module_audiences.sql** — events/prayers/documents audience columns + policies.
+1. **0016_org_units_memberships.sql** — create `org_units`, backfill from `branches` (kind='branch') + a 'shared_family' unit; add `unit_memberships`, backfill from `profiles.branch_id` (role='administrator' ← current stewards? no: role='member'/viewer baseline; admins assigned explicitly). `profiles.branch_id` kept as a deprecated mirror for one release (compat). Applied in production.
+2. **0017_resource_access.sql** — grant tables + `can_access()`/`visible_unit_ids()` helpers + audit triggers; convert current `using(true)` reads into explicit grants.
+3. **0018_funds.sql** — `mission_funds`, seed Family Mission Fund, add `fund_id` with backfill, rewrite fund policies/functions to scoped checks. *(first breaking-behavior step — needs explicit approval)*
+4. **0019_module_audiences.sql** — events/prayers/documents audience columns + policies.
 5. Cleanup migration later drops the `branch_id` mirror once no code references it.
 
 Each migration ships with rollback notes; none drops tables/columns in-place.

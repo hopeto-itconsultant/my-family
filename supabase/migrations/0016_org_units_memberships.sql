@@ -115,6 +115,14 @@ language sql stable security definer set search_path = public as $$
   end;
 $$;
 
+-- [hws fix] RLS-safe membership check (policy on unit_memberships cannot
+-- query unit_memberships directly -> infinite recursion).
+create or replace function public.is_active_unit_member(p_unit uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.unit_memberships
+                  where unit_id = p_unit and member_id = auth.uid() and status = 'active');
+$$;
+
 -- ----------------------------------------------------------------------------
 -- 5) Guard trigger — self-grant / elevation rules + audit of every change
 -- ----------------------------------------------------------------------------
@@ -146,11 +154,11 @@ begin
         raise exception 'You can only grant roles up to your own level in this unit.';
       end if;
       if new.status is distinct from old.status
-         and not public.can_grant_role_in_unit(actor, new.unit_id, 'viewer') then
+         and not public.can_grant_role_in_unit(actor, new.unit_id, 'coordinator') then -- [hws fix] was 'viewer'
         raise exception 'Only a unit administrator-level member can change membership status.';
       end if;
     elsif (tg_op = 'DELETE') then
-      if not public.can_grant_role_in_unit(actor, old.unit_id, 'viewer') then
+      if not public.can_grant_role_in_unit(actor, old.unit_id, 'coordinator') then -- [hws fix] was 'viewer'
         raise exception 'Only a unit administrator-level member can remove memberships.';
       end if;
       perform public.log_audit(actor, 'membership.remove', 'unit_memberships',
@@ -246,7 +254,7 @@ on conflict (unit_id, member_id) do nothing;
 -- Shared Family membership so they retain a management foothold post-migration.
 insert into public.unit_memberships (unit_id, member_id, member_role, status, grant_reason)
 select '00000000-0000-0000-0000-0000000000fa', p.id,
-       case p.role when 'admin' then 'administrator' else 'coordinator' end,
+       (case p.role when 'admin' then 'administrator' else 'coordinator' end)::public.membership_role,  -- [hws fix] text->enum cast
        'active', 'Backfilled: global steward without a branch (migration 0014).'
   from public.profiles p
  where p.role in ('admin','treasurer') and p.branch_id is null
@@ -280,12 +288,7 @@ create policy unit_memberships_select on public.unit_memberships
   for select to authenticated using (
     public.jwt_role() = 'admin'
     or member_id = auth.uid()
-    or exists (
-      select 1 from public.unit_memberships mine
-       where mine.member_id = auth.uid()
-         and mine.unit_id = unit_memberships.unit_id
-         and mine.status = 'active'
-    )
+    or public.is_active_unit_member(unit_id)   -- [hws fix] was self-referencing subquery (recursion)
   );
 
 -- Insert/update/delete go through server actions executed by the calling
@@ -299,17 +302,17 @@ create policy unit_memberships_insert on public.unit_memberships
 
 create policy unit_memberships_update on public.unit_memberships
   for update to authenticated
-  using (public.can_grant_role_in_unit(auth.uid(), unit_id, 'viewer'))
+  using (public.can_grant_role_in_unit(auth.uid(), unit_id, 'coordinator'))  -- [hws fix] was 'viewer'
   with check (public.can_grant_role_in_unit(auth.uid(), unit_id, member_role));
 
 create policy unit_memberships_delete on public.unit_memberships
   for delete to authenticated
-  using (public.can_grant_role_in_unit(auth.uid(), unit_id, 'viewer'));
+  using (public.can_grant_role_in_unit(auth.uid(), unit_id, 'coordinator'));  -- [hws fix] was 'viewer'
 
 -- ----------------------------------------------------------------------------
 -- 9) Convenience views used by the app layer
 -- ----------------------------------------------------------------------------
-create or replace view public.my_units as
+create or replace view public.my_units with (security_invoker = true) as  -- [hws fix]
   select u.*, um.member_role, um.status as membership_status
     from public.unit_memberships um
     join public.org_units u on u.id = um.unit_id
@@ -318,3 +321,15 @@ create or replace view public.my_units as
      and u.status = 'active';
 
 grant select on public.my_units to authenticated;
+
+-- [hws fix] 0009-style grants: nothing for anon/public; triggers not callable
+revoke all on public.my_units from anon;
+revoke all on public.org_units, public.unit_memberships from anon;
+revoke execute on function public.membership_role_level(public.membership_role) from public, anon;
+revoke execute on function public.can_grant_role_in_unit(uuid, uuid, public.membership_role) from public, anon;
+revoke execute on function public.is_active_unit_member(uuid) from public, anon;
+grant execute on function public.membership_role_level(public.membership_role) to authenticated;
+grant execute on function public.can_grant_role_in_unit(uuid, uuid, public.membership_role) to authenticated;
+grant execute on function public.is_active_unit_member(uuid) to authenticated;
+revoke execute on function public.guard_membership_change() from public, anon, authenticated;
+revoke execute on function public.guard_unit_change() from public, anon, authenticated;

@@ -1,5 +1,5 @@
 // Unit tests for the access-control Phase 2 pure helpers (src/lib/access.ts).
-// Run with: npm test   (mirrors SQL membership_role_level from migration 0014)
+// Run with: npm test   (mirrors SQL membership_role_level from migration 0016)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -10,7 +10,7 @@ import {
   sortUnits,
 } from './access';
 
-test('role ladder matches migration 0014 exactly', () => {
+test('role ladder matches migration 0016 exactly', () => {
   assert.deepEqual(MEMBERSHIP_ROLE_LEVEL, {
     viewer: 1, contributor: 2, editor: 3, reviewer: 4,
     treasurer: 5, coordinator: 6, administrator: 7,

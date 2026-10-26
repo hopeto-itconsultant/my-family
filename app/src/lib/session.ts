@@ -6,7 +6,7 @@ import type { Branch, FamilyEvent, FamilyRelation, Profile, ProfileWithBranch } 
 
 export type SessionUser = NonNullable<Awaited<ReturnType<typeof getSession>>['profile']>;
 
-/** Steward roles (post-merge of coordinator into treasurer — migration 0013):
+/** Steward roles (post-merge of coordinator into treasurer — migration 0015):
  * treasurers manage the tree/events/history AND record every Mission Fund
  * entry manually; admins keep oversight. Mirrors RLS (`is_steward()`). */
 export function canManage(rel: Pick<Profile, 'role'>): boolean {

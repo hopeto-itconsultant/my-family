@@ -33,9 +33,13 @@ drop index if exists public.profiles_single_treasurer_idx;
 create or replace function public.is_steward()
 returns boolean
 language sql stable
+set search_path = public   -- [hws fix]
 as $$
   select public.jwt_role() in ('treasurer','admin');
 $$;
+-- [hws fix] helper: signed-in only, like other 0009 helpers
+revoke execute on function public.is_steward() from public, anon;
+grant execute on function public.is_steward() to authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 4) One-time audit record of the merge, written as the operator running this
@@ -112,7 +116,7 @@ create policy history_delete on public.history_entries
 drop policy if exists photos_delete on public.photos;
 create policy photos_delete on public.photos
   for delete to authenticated
-  using (created_by = auth.uid() or public.is_steward());
+  using (uploaded_by = auth.uid() or public.is_steward());  -- [hws fix] photos column is uploaded_by
 
 drop policy if exists assets_update on public.family_assets;
 create policy assets_update on public.family_assets
@@ -204,7 +208,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.generate_reminders() from anon, authenticated;
+revoke execute on function public.generate_reminders() from public, anon, authenticated; -- [hws fix] + public
 grant execute on function public.generate_reminders() to service_role;
 
 comment on type public.family_role is

@@ -1,5 +1,5 @@
 // Access-control Phase 2 — pure helpers mirroring the SQL role ladder in
-// migration 0014 (`membership_role_level`). Keep BOTH in sync; the SQL side
+// migration 0016 (`membership_role_level`). Keep BOTH in sync; the SQL side
 // is the enforcement point, this side only drives UI affordances.
 
 export type UnitKind = 'branch' | 'group';

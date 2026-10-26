@@ -96,6 +96,17 @@ create trigger profiles_clear_birthday_hint
   on public.profiles
   for each row execute function public.clear_birthday_hint();
 
+-- [hws fix] auto-event trigger must also fire when birthday_hint changes on UPDATE
+drop trigger if exists profiles_sync_recurring on public.profiles;
+create trigger profiles_sync_recurring
+  after insert or update of birth_date, birthday_hint, anniversary_date, full_name
+  on public.profiles
+  for each row execute function public.sync_recurring_events();
+
+-- [hws fix] keep trigger functions off the RPC surface (0009 lockdown)
+alter function public.clear_birthday_hint() set search_path = public;
+revoke execute on function public.clear_birthday_hint() from public, anon, authenticated;
+
 -- 4) Robust auto-event sync:
 --    * dedupe (member, kind, notes-tag) via a partial unique index so the
 --      insert-if-absent pattern is race-free (events.id has no default, so
@@ -165,3 +176,7 @@ begin
 
   return new;
 end $$;
+
+-- [hws fix] re-assert 0009 lockdown on the re-created functions
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.sync_recurring_events() from public, anon, authenticated;
