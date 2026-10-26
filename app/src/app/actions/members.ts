@@ -1,7 +1,7 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone, tenDigits } from '@/lib/phone';
@@ -9,6 +9,27 @@ import { parseNicknames } from '@/lib/nicknames';
 import type { FamilyRole } from '@/lib/types';
 
 export type MemberFormState = { ok: boolean; error?: string };
+
+/** Only an admin may manage accounts. Checked against the DB row (source of
+ *  truth), not just the JWT claim. Shared with the roster importer. */
+export async function requireAdminCtx() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: me } = await supabase
+    .from('profiles')
+    .select('role, full_name')
+    .eq('id', user.id)
+    .single();
+  if (!me || me.role !== 'admin') return null;
+  return { supabase, actorId: user.id };
+}
+
+async function requireAdmin() {
+  return requireAdminCtx();
+}
 
 /** Shared extraction/validation of the new profile fields (migration 0010). */
 function readLifeFields(formData: FormData): {
