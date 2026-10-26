@@ -131,8 +131,8 @@ export default async function EventsPage() {
 
       <p className="text-[11px] leading-relaxed text-stone-500">
         {leader
-          ? 'As a coordinator you can add and remove any event. Every change is visible to the whole family.'
-          : 'Members may add their own birthday. Ask a coordinator to add anniversaries or meetups.'}
+          ? 'As treasurer you can add and remove any event. Every change is visible to the whole family.'
+          : 'Members may add their own birthday. Ask the treasurer to add anniversaries or meetups.'}
       </p>
     </div>
   );

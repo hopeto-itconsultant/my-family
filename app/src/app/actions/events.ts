@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, canManage } from '@/lib/session';
 import type { EventKind } from '@/lib/types';
@@ -9,7 +9,7 @@ import type { ActionResult } from './tree';
 export type { ActionResult };
 
 /**
- * Create an event. RLS is the real gate: coordinators+ may create anything;
+ * Create an event. RLS is the real gate: stewards (treasurer/admin) may create anything;
  * members may only add their OWN birthday (see events_insert_own_or_leader).
  */
 export async function createEvent(input: {
@@ -23,7 +23,7 @@ export async function createEvent(input: {
 }): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!canManage(profile) && !(input.kind === 'birthday' && input.member_id === profile.id)) {
-    return { ok: false, error: 'You can only add your own birthday. Ask a coordinator for other events.' };
+    return { ok: false, error: 'You can only add your own birthday. Ask the treasurer to add anniversaries or meetups.' };
   }
 
   const title = input.title?.trim() ?? '';
@@ -48,6 +48,7 @@ export async function createEvent(input: {
     return { ok: false, error: 'Could not save the event (permission or validation).' };
   }
   revalidatePath('/events');
+  revalidateTag('events');
   revalidatePath('/');
   return { ok: true };
 }
@@ -61,12 +62,13 @@ export async function deleteEvent(id: string): Promise<ActionResult> {
   if (!canManage(profile)) {
     const { data } = await supabase.from('events').select('id, member_id').eq('id', id).single();
     if (!data || data.member_id !== profile.id) {
-      return { ok: false, error: 'Only coordinators can remove this event.' };
+      return { ok: false, error: 'Only the treasurer can remove this event.' };
     }
   }
   const { error } = await supabase.from('events').delete().eq('id', id);
   if (error) return { ok: false, error: 'Could not remove the event.' };
   revalidatePath('/events');
+  revalidateTag('events');
   revalidatePath('/');
   return { ok: true };
 }

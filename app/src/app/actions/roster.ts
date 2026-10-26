@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdminCtx } from './members';
@@ -79,7 +79,7 @@ export async function previewRoster(
 export async function importRoster(rows: ParsedRosterRow[], branchId: string | null, role: FamilyRole): Promise<{ created: number; skipped: number; errors: string[] }> {
   const ctx = await requireAdminCtx();
   if (!ctx) return { created: 0, skipped: 0, errors: ['Only an admin can import members.'] };
-  if (!['member', 'coordinator', 'admin'].includes(role)) {
+  if (!['member', 'treasurer', 'admin'].includes(role)) {
     return { created: 0, skipped: 0, errors: ['Invalid default role for import.'] };
   }
   if (rows.length === 0) return { created: 0, skipped: 0, errors: [] };
@@ -175,6 +175,8 @@ export async function importRoster(rows: ParsedRosterRow[], branchId: string | n
   });
 
   revalidatePath('/directory');
+  revalidateTag('directory');
+  revalidateTag('events');
   revalidatePath('/members');
   revalidatePath('/events');
   return { created: created.length, skipped, errors };

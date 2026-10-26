@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -60,7 +60,9 @@ function readLifeFields(formData: FormData): {
   return { nicknames: nicknames.length ? nicknames : null, birthDate, birthYear, dateOfDeath };
 }
 
-const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'coordinator', 'treasurer', 'admin'];
+// Coordinator was merged into Treasurer (migration 0013): one steward role
+// manages the family app AND records all Mission Fund entries manually.
+const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
 
 function validDate(s: string): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
@@ -95,19 +97,6 @@ export async function createMember(
     return { ok: false, error: 'Temporary password must be at least 8 characters.' };
 
   const admin = createAdminClient();
-
-  if (role === 'treasurer') {
-    const { data: existing } = await admin
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'treasurer')
-      .maybeSingle();
-    if (existing)
-      return {
-        ok: false,
-        error: `A treasurer is already assigned (${existing.full_name}). Change that person's role first.`,
-      };
-  }
 
   const phone = normalizePhone(rawPhone)!;
   const { data: dup } = await admin
@@ -179,6 +168,7 @@ export async function createMember(
   });
 
   revalidatePath('/directory');
+  revalidateTag('directory');
   revalidatePath('/members');
   redirect('/members?created=1');
 }
@@ -205,16 +195,9 @@ export async function updateMember(
     return { ok: false, error: 'Phone must be a 10-digit mobile number.' };
   if (!ASSIGNABLE_ROLES.includes(role)) return { ok: false, error: 'Invalid role.' };
 
-  const admin = createAdminClient();
-  if (role === 'treasurer') {
-    const { data: existing } = await admin
-      .from('profiles')
-      .select('id')
-      .eq('role', 'treasurer')
-      .neq('id', id)
-      .maybeSingle();
-    if (existing) return { ok: false, error: 'Another member is already the treasurer.' };
-  }
+  // Multiple treasurers/stewards are allowed since migration 0013
+  // (coordinator merged into treasurer); every role change is audited by the
+  // profile trigger, so no app-level single-treasurer guard is needed here.
 
   // Runs under RLS (migration 0009 allows treasurer/admin updates); the DB
   // guard trigger audits the change and blocks invalid role edits.
@@ -250,6 +233,7 @@ export async function updateMember(
   });
 
   revalidatePath('/directory');
+  revalidateTag('directory');
   revalidatePath('/members');
   redirect(`/members/${id}?saved=1`);
 }

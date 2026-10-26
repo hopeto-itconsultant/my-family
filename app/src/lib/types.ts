@@ -1,5 +1,5 @@
 // Shared domain types — mirror of the Postgres schema (supabase/migrations).
-export type FamilyRole = 'member' | 'coordinator' | 'treasurer' | 'admin';
+export type FamilyRole = 'member' | 'treasurer' | 'admin';
 
 export interface Branch {
   id: string;
@@ -232,13 +232,12 @@ export interface ReconcileReport {
 
 export const ROLE_LABELS: Record<FamilyRole, string> = {
   member: 'Member',
-  coordinator: 'Coordinator',
   treasurer: 'Treasurer',
   admin: 'Admin',
 };
 
 export function isLeader(role: FamilyRole): boolean {
-  return role === 'coordinator' || role === 'treasurer' || role === 'admin';
+  return role === 'treasurer' || role === 'admin';
 }
 
 export function isFinanceRole(role: FamilyRole): boolean {

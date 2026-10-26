@@ -32,7 +32,7 @@ export default async function TreePage() {
 
       {tree.hasCycle && (
         <p className="text-xs rounded-xl bg-amber-50 text-amber-900 ring-1 ring-amber-200 p-3">
-          ⚠️ Some parent relationships form a loop — a coordinator should review
+          ⚠️ Some parent relationships form a loop — the treasurer should review
           the edges. The view below is best-effort until fixed.
         </p>
       )}

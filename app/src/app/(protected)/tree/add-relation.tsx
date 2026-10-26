@@ -187,7 +187,7 @@ export function AddRelationSheet({ people }: { people: PersonOption[] }) {
 
             <p className="text-[11px] leading-relaxed text-stone-500">
               Relations are visible to all signed-in relatives and every change is
-              recorded in the audit log. Only coordinators and admins can edit the
+              recorded in the audit log. Only the treasurer and admins can edit the
               tree (enforced by database policies, not just this screen).
             </p>
           </div>
