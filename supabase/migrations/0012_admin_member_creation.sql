@@ -129,3 +129,7 @@ drop trigger if exists profiles_sync_recurring on public.profiles;
 create trigger profiles_sync_recurring
   after insert or update of birth_date, anniversary_date, full_name on public.profiles
   for each row execute function public.sync_recurring_events();
+
+-- [hws fix] trigger functions are not client-callable (0009 lockdown).
+revoke execute on function public.sync_recurring_events() from public, anon, authenticated;
+revoke execute on function public.handle_new_user() from public, anon, authenticated;

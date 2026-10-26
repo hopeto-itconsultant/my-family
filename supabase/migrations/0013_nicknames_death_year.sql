@@ -31,6 +31,7 @@ create index if not exists profiles_nicknames_gin
 create or replace function public.normalize_member_dates()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   -- Trim / lowercase / dedupe nicknames; empty array -> NULL.
@@ -132,3 +133,7 @@ begin
 
   return new;
 end $$;
+
+-- [hws fix] trigger functions are not client-callable (0009 lockdown).
+revoke execute on function public.normalize_member_dates() from public, anon, authenticated;
+revoke execute on function public.sync_recurring_events() from public, anon, authenticated;
