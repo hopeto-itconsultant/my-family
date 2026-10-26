@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/env';
-import type { FamilyEvent, FamilyRelation, Profile, ProfileWithBranch } from '@/lib/types';
+import type { Branch, FamilyEvent, FamilyRelation, Profile, ProfileWithBranch } from '@/lib/types';
 
 export type SessionUser = NonNullable<Awaited<ReturnType<typeof getSession>>['profile']>;
 
@@ -43,6 +43,17 @@ export async function getDirectory(): Promise<ProfileWithBranch[]> {
     .order('full_name');
   if (error || !data) return [];
   return data as unknown as ProfileWithBranch[];
+}
+
+/** All family branches (RLS: readable by any signed-in relative). */
+export async function getBranches(): Promise<Branch[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('branches')
+    .select('id, name, order_hint')
+    .order('order_hint');
+  if (error || !data) return [];
+  return data as Branch[];
 }
 
 /** All relation edges (RLS: readable by any signed-in relative). */

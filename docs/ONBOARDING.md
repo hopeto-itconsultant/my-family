@@ -2,10 +2,26 @@
 
 ## 1. One-time Supabase setup
 1. Create a project at supabase.com (Free tier is fine for ≤150 members).
-2. SQL Editor → run migrations **in order**: `0001_init.sql` … `0006_notifications.sql`
+2. SQL Editor → run migrations **in order**: `0001_init.sql` … `0007_phone_login.sql`
    (or `supabase db push` with the CLI).
-3. Auth → Providers: keep Email only. **Disable public sign-up**; invite members from
-   Auth → Users → "Invite user" (one email per relative).
+3. Auth → Providers: keep Email enabled (it backs phone accounts). **Disable public
+   sign-up**. Members log in with their registered **mobile number** (migration 0007).
+   Create accounts either by email invite (Auth → Users → "Invite user") or as a
+   phone-only account directly in SQL — no real email needed:
+   ```sql
+   -- Admin runs this to register a phone-only member:
+   insert into auth.users (instance_id, aud, role, email, encrypted_password,
+            email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+   values ('base','authenticated','authenticated',
+           'OFH-919876543210@phone.invalid', crypt('<initial password>', gen_salt('bf')),
+           now(), now(), now(),
+           '{"provider":"email","providers":["email"],"role":"member"}',
+           jsonb_build_object('full_name','<Name>'));
+   -- The signup trigger creates the profile row; then set the login phone:
+   update public.profiles set phone='919876543210'
+     where id = (select id from auth.users where email='OFH-919876543210@phone.invalid');
+   ```
+   Both login modes (mobile + email) work side by side on `/login`.
 4. JWT role claim: add an *After Sign-In* hook (or custom claims setting) that copies
    `profiles.role` into `app_metadata.role`, so RLS `jwt_role()` works for treasurer/admin
    policies. Until then, verification actions rely on server-side role checks.
@@ -28,8 +44,10 @@
    (branch UI arrives with admin tools; branch names are pre-seeded).
 3. Promote treasurers/coordinators: `update public.profiles set role='treasurer' where id=…;`
    — every change lands in the append-only `audit_log`.
-4. Send invites in batches of ~25 (Supabase invite rate limits); share the printed card:
-   “Check email for your invite → set password → open <domain> → Add to Home Screen”.
+4. Share the printed card: “Open <domain> → enter your mobile number + password →
+   Add to Home Screen”. First-time users receive their initial password from the admin
+   (in person or by WhatsApp — never collect it back). For email-invited members the
+   original flow still applies; send invites in batches of ~25 (rate limits).
 
 ## 4. Treasurer SOP (Mission Fund)
 - Daily/weekly: open Mission Fund → verify each pending payment against bank statement,
@@ -41,8 +59,10 @@
   a verified row directly.
 
 ## 5. Security checklist (verify before go-live)
-- [ ] All 6 migrations applied; `revoke` statements ran without error.
-- [ ] Public sign-up disabled; only invited emails can create sessions.
+- [ ] All 7 migrations applied; `revoke` statements ran without error.
+- [ ] Public sign-up disabled; only registered mobiles/invited emails can create sessions.
+- [ ] Migration `0007_phone_login.sql` applied; one phone login tested end-to-end;
+      duplicate-phone registration rejected by the unique index.
 - [ ] Service-role key exists ONLY in server env (never in git, never NEXT_PUBLIC_*).
 - [ ] Spot-check RLS: signed-out request to `/directory` redirects; member cannot UPDATE
       contributions of others (test with two accounts).

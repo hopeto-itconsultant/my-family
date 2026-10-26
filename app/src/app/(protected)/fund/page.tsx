@@ -6,9 +6,8 @@ import {
   getFundSummary, getContributions, getExpenses, getBranchCollection, getAuditTrail, getReceiptUrl,
 } from '@/app/actions/fund';
 import type { AuditRow, Contribution, Expense, ProfileWithBranch } from '@/lib/types';
-import {
-  RecordPaymentSheet, VerifyControls, WithdrawButton, ExpenseRequestSheet, ExpenseControls,
-} from './fund-widgets';
+import { METHOD_LABELS } from '@/lib/types';
+import { RecordPaymentSheet, VerifyControls, ExpenseRequestSheet, ExpenseControls } from './fund-widgets';
 
 export const metadata = { title: 'Mission Fund · Our Family Home' };
 
@@ -20,7 +19,7 @@ const STATUS_BADGE: Record<Contribution['status'], string> = {
   reversed: 'bg-orange-100 text-orange-800',
 };
 const STATUS_LABEL: Record<Contribution['status'], string> = {
-  declared: 'declared', pending_verification: 'awaiting verification', verified: '✓ received',
+  declared: 'draft', pending_verification: 'awaiting verification', verified: '✓ received',
   rejected: 'rejected', reversed: 'reversed',
 };
 const EXPENSE_BADGE: Record<Expense['status'], [string, string]> = {
@@ -39,6 +38,7 @@ function fmtDateTime(iso: string): string {
 
 function auditLabel(a: AuditRow): string {
   const map: Record<string, string> = {
+    'contribution.record': 'recorded a payment (manual)',
     'contribution.declare': 'declared a payment',
     'contribution.mark_sent': 'marked a payment as sent',
     'contribution.verify': 'verified a payment ✓',
@@ -102,13 +102,18 @@ export default async function FundPage() {
         </p>
       </section>
 
-      {/* Primary actions */}
-      <div className="space-y-3">
-        <RecordPaymentSheet />
-        {mine.some((c) => c.status === 'declared' || c.status === 'pending_verification') && (
-          <p className="text-xs text-stone-500">Your recent entries sit in the treasurer’s queue — thank you 🙏</p>
-        )}
-      </div>
+      {/* Primary actions — only the treasurer records entries; everyone else views */}
+      {isTreasurer ? (
+        <div className="space-y-3">
+          <RecordPaymentSheet directory={directory.filter((d) => d.role !== 'treasurer')} />
+        </div>
+      ) : (
+        <p className="text-xs rounded-xl bg-stone-100 text-stone-600 px-4 py-3">
+          👀 You can view every fund record here. All entries are recorded manually by the family
+          treasurer — payments made to the treasurer (cash or UPI) appear here as “awaiting
+          verification” until confirmed received.
+        </p>
+      )}
 
       {/* Branch collection progress this month */}
       {branchRows.length > 0 && (
@@ -173,12 +178,11 @@ export default async function FundPage() {
             <div key={c.id} className="rounded-2xl bg-white ring-1 ring-stone-200 p-3 flex items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-medium">{formatPaise(c.amount_paise)} · {c.month_ref ?? 'voluntary gift'}</p>
-                <p className="text-xs text-stone-500">{fmtDateTime(c.declared_at)} · {c.method.replace('_', ' ')}</p>
+                <p className="text-xs text-stone-500">{fmtDateTime(c.declared_at)} · {METHOD_LABELS[c.method] ?? c.method}</p>
                 {c.reject_reason && <p className="text-xs text-red-600">{c.reject_reason}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] rounded-full px-2 py-0.5 ${STATUS_BADGE[c.status]}`}>{STATUS_LABEL[c.status]}</span>
-                {(c.status === 'declared' || c.status === 'pending_verification') && <WithdrawButton id={c.id} />}
               </div>
             </div>
           ))}
@@ -189,7 +193,7 @@ export default async function FundPage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Family ledger</h2>
-          <ExpenseRequestSheet />
+          {isTreasurer && <ExpenseRequestSheet />}
         </div>
         {ledger.length === 0 && (
           <p className="text-sm text-stone-500 rounded-xl bg-white ring-1 ring-stone-200 p-4">
@@ -201,7 +205,7 @@ export default async function FundPage() {
           <div key={c.id} className="rounded-2xl bg-white ring-1 ring-stone-200 p-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm truncate">{names[c.member_id] ?? 'Member'} · {formatPaise(c.amount_paise)}</p>
-              <p className="text-xs text-stone-500">{c.month_ref ?? 'voluntary'} · {fmtDateTime(c.declared_at)}{c.bank_ref ? ` · ref ${c.bank_ref}` : ''}</p>
+              <p className="text-xs text-stone-500">{METHOD_LABELS[c.method] ?? c.method} · {c.month_ref ?? 'voluntary'} · {fmtDateTime(c.declared_at)}{c.bank_ref ? ` · ref ${c.bank_ref}` : ''}</p>
             </div>
             <span className={`text-[10px] shrink-0 rounded-full px-2 py-0.5 ${STATUS_BADGE[c.status]}`}>{STATUS_LABEL[c.status]}</span>
           </div>
@@ -243,7 +247,7 @@ export default async function FundPage() {
       )}
 
       <p className="text-[11px] text-stone-400">
-        Balance rule: verified contributions − paid expenses, computed in PostgreSQL on every visit.
+        Only the treasurer records entries (manual cash/UPI-online entries only). Balance rule: verified contributions − paid expenses, computed in PostgreSQL on every visit.
         Corrections are reversals with reasons — history is never rewritten.{' '}
         <Link href="/setup" className="underline">Setup notes</Link>
       </p>

@@ -96,78 +96,71 @@ export async function getReceiptUrl(path: string): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Member flows — ALWAYS go through the guarded DB functions. A member can
-// never insert money as "verified": the state machine lives in Postgres.
+// Treasurer-only write flows — ALWAYS go through the guarded DB functions.
+// Migration 0008 makes the TREASURER the single person who records fund
+// entries; every other role is view-only (RLS refuses their writes, and the
+// SECURITY DEFINER functions re-check the role inside Postgres anyway).
 // ---------------------------------------------------------------------------
-/** Record a bank/UPI payment manually → stored as pending_verification. */
+/** Treasurer records a cash / UPI-online payment manually → pending_verification. */
 export async function recordPayment(input: {
+  memberId: string;
   amountRupees: string;
   monthRef: string; // '' = voluntary gift (no month)
   method: PaymentMethod;
-  referenceHint: string; // e.g. UPI ref shown to treasurer (not proof!)
   note: string;
 }): Promise<ActionResult> {
   const profile = await requireProfile();
+  if (profile.role !== 'treasurer') return { ok: false, error: 'Only the treasurer can record fund entries.' };
   const amount = parseRupeesToPaise(input.amountRupees);
   if (amount === null) return { ok: false, error: 'Enter a valid amount above ₹0.' };
   if (input.monthRef && !/^\d{4}-\d{2}$/.test(input.monthRef))
     return { ok: false, error: 'Bad month reference.' };
+  if (!UUID_RE.test(input.memberId)) return { ok: false, error: 'Choose the member who paid.' };
+  if (input.method !== 'cash' && input.method !== 'upi_online')
+    return { ok: false, error: 'Payment must be marked Cash or UPI/Online.' };
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc('declare_contribution', {
+  const { error } = await supabase.rpc('record_contribution_as_treasurer', {
+    p_member: input.memberId,
     p_amount: amount,
     p_month: input.monthRef || null,
     p_method: input.method,
-    p_note: [input.referenceHint.trim(), input.note.trim()].filter(Boolean).join(' · ') || null,
+    p_note: input.note.trim() || null,
   });
-  if (error) return { ok: false, error: 'Could not record the payment.' };
-
-  // Immediately move it to pending_verification ("money sent") via the RPC,
-  // so it sits in the treasurer's queue — still NOT counted as received.
-  const { data: mine } = await supabase
-    .from('contributions')
-    .select('id')
-    .eq('member_id', profile.id)
-    .eq('status', 'declared')
-    .order('declared_at', { ascending: false })
-    .limit(1);
-  if (mine?.[0]?.id) {
-    await supabase.rpc('mark_contribution_sent', { p_id: mine[0].id });
+  if (error) {
+    const msg = error.message ?? '';
+    if (/duplicate key/.test(msg))
+      return { ok: false, error: 'That member already has an entry for this month & amount. Check the ledger before adding a duplicate.' };
+    return { ok: false, error: friendlyError(msg) || 'Could not record the payment.' };
   }
   revalidatePath('/fund');
   return { ok: true };
 }
 
-/** Withdraw an unverified declaration (rejected w/ reason; never touches balance). */
-export async function withdrawDeclaration(id: string): Promise<ActionResult> {
-  const profile = await requireProfile();
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('contributions')
-    .update({ status: 'rejected', reject_reason: 'Withdrawn by member before verification' })
-    .eq('id', id)
-    .eq('member_id', profile.id)
-    .in('status', ['declared', 'pending_verification']);
-  if (error) return { ok: false, error: 'Only unverified declarations can be withdrawn.' };
-  revalidatePath('/fund');
-  return { ok: true };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function friendlyError(msg: string): string | null {
+  if (/only the treasurer/i.test(msg)) return 'Only the treasurer can do this.';
+  if (/positive/.test(msg)) return 'Amount must be above ₹0.';
+  return null;
 }
 
 // ---------------------------------------------------------------------------
 // Treasurer flows (the DB functions enforce the role + transitions anyway)
 // ---------------------------------------------------------------------------
 async function rpc(name: string, args: Record<string, unknown>): Promise<ActionResult> {
+  const profile = await requireProfile();
+  if (profile.role !== 'treasurer') return { ok: false, error: 'Only the treasurer can do this.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc(name, args);
-  if (error) return { ok: false, error: error.message.replace(/^.*?: /, '') };
+  if (error) return { ok: false, error: friendlyError(error.message ?? '') ?? error.message.replace(/^.*?: /, '') };
   revalidatePath('/fund');
   return { ok: true };
 }
 
-export async function verifyContribution(id: string, bankRef: string): Promise<ActionResult> {
-  if (bankRef.trim().length < 3)
-    return { ok: false, error: 'Bank/UPI reference is required to verify.' };
-  return rpc('verify_contribution', { p_id: id, p_bank_ref: bankRef.trim() });
+export async function verifyContribution(id: string, ref: string): Promise<ActionResult> {
+  if (ref.trim().length < 3)
+    return { ok: false, error: 'A reference is required — UPI/RRN number, or “CASH · voucher no.” for cash.' };
+  return rpc('verify_contribution', { p_id: id, p_bank_ref: ref.trim() });
 }
 
 export async function rejectContribution(id: string, reason: string): Promise<ActionResult> {
@@ -223,13 +216,14 @@ export async function payExpense(input: {
   });
 }
 
-/** Any member may submit an expense request (lands as 'submitted'). */
+/** The treasurer records an expense (manual entry only). Lands as 'submitted'. */
 export async function submitExpenseRequest(input: {
   title: string;
   purpose: string;
   amountRupees: string;
 }): Promise<ActionResult> {
   const profile = await requireProfile();
+  if (profile.role !== 'treasurer') return { ok: false, error: 'Only the treasurer can record expenses.' };
   if (input.title.trim().length < 2) return { ok: false, error: 'Give the expense a title.' };
   const amount = parseRupeesToPaise(input.amountRupees);
   if (amount === null) return { ok: false, error: 'Enter a valid amount.' };
@@ -241,7 +235,7 @@ export async function submitExpenseRequest(input: {
     amount_paise: amount,
     requested_by: profile.id,
   });
-  if (error) return { ok: false, error: 'Could not submit the request.' };
+  if (error) return { ok: false, error: 'Could not record the expense.' };
   revalidatePath('/fund');
   return { ok: true };
 }

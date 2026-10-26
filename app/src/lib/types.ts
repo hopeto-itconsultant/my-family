@@ -14,6 +14,11 @@ export interface Profile {
   role: FamilyRole;
   phone: string | null;
   avatar_url: string | null;
+  birth_date?: string | null;       // 'YYYY-MM-DD' (migration 0009)
+  birth_year?: number | null;       // separate column (migration 0010); kept in sync with birth_date by trigger
+  anniversary_date?: string | null; // 'YYYY-MM-DD' (migration 0009)
+  nicknames?: string[] | null;      // pet names, normalized text[] (migration 0010)
+  date_of_death?: string | null;    // 'YYYY-MM-DD', optional (migration 0010)
   created_at: string;
   updated_at: string;
 }
@@ -124,13 +129,19 @@ export type ContributionStatus =
   | 'rejected'
   | 'reversed';
 
-export type PaymentMethod = 'upi' | 'bank_transfer' | 'cash' | 'other';
+// Treasurer records payments manually as either cash or UPI/online (0008).
+export type PaymentMethod = 'cash' | 'upi_online';
+
+export const METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: '💵 Cash',
+  upi_online: '📱 UPI / Online',
+};
 
 export interface Contribution {
   id: string;
   member_id: string;
   amount_paise: number;
-  month_ref: string; // YYYY-MM (null for voluntary gifts)
+  month_ref: string | null; // YYYY-MM pledge period (null = voluntary gift)
   method: PaymentMethod;
   status: ContributionStatus;
   bank_ref: string | null;

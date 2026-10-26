@@ -13,7 +13,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Our Family Home</h1>
           <p className="mt-1 text-teal-100 text-sm">
-            A private place for our family — invitation only.
+            Sign in with your registered mobile number. Invitation only.
           </p>
         </div>
 
@@ -28,8 +28,8 @@ export default function LoginPage() {
               then restart <code className="bg-black/20 px-1 rounded">npm run dev</code>.
             </p>
             <p className="text-teal-200/80">
-              New relatives join via Supabase email invites — there is no public
-              sign-up. Ask an admin for your invite.
+              Admins register each relative's mobile number; there is no public
+              sign-up. Ask a family admin if you don't have an account yet.
             </p>
           </div>
         ) : (

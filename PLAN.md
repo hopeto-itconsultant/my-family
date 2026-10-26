@@ -151,3 +151,48 @@ Or create the repo first on GitHub ("New repository" → *don't* initialize with
 - No online payment collection/gateway integration (manual bank/UPI recording only, as specified).
 - No invented "real" transactions — sample rows are labeled prototype data.
 - No multi-family tenancy; single family instance keeps RLS simple.
+
+## Phase 10 — Mobile-number login ✅ built
+- Migration `0007_phone_login.sql`: `normalize_phone()` (last 10 digits, +91 canonical),
+  generated unique `phone_normalized` column, shadow-email resolver
+  (`OFH-<phone>@phone.invalid`, RFC-reserved undeliverable domain), triggers to keep
+  `auth.users.email` in sync for phone accounts only, and an audit entry on every
+  phone change (login identifier changes are sensitive).
+- `/login` defaults to **📱 Mobile number** with a secondary ✉️ Email tab (email-invited
+  members keep working). Server Action resolves the phone via the DB helper, then signs
+  in; unknown numbers get the same generic error as a wrong password — no enumeration.
+- Profile editor: mobile number is now labeled as the sign-in credential, validated to
+  10 digits, duplicates rejected by the unique index with a friendly message.
+- Runbook updated with phone-only account creation SQL (no real email required).
+
+## Change log — Treasurer-only Mission Fund (migration 0008, Oct 26 2026)
+Per family decision: **only the treasurer records Mission Fund entries** (manual only).
+- New `treasurer` is the single writer for contributions & expenses; enforced by RLS + SECURITY DEFINER checks. A partial unique index guarantees at most ONE active treasurer. Admins keep oversight but no longer touch money rows.
+- Everyone else: family-wide **view-only** of all fund records.
+- Payment methods reduced to **Cash** or **UPI/Online** (`payment_method` enum migrated in 0008).
+- Bank reconciliation retired: statement functions revoked; `/reconcile` shows a retirement notice.
+- Flow now: treasurer records → *awaiting verification* → treasurer confirms receipt (UPI RRN / “CASH · voucher no.”) → *verified* (counted). Reversals remain append-only audited corrections.
+- Apply `supabase/migrations/0008_treasurer_only_fund.sql`, then set exactly one profile: `update profiles set role='treasurer' where id='<person>';` (their JWT app_metadata.role must be refreshed by re-login / claims hook).
+
+## Change log — Admin member management (migration 0009, Oct 26 2026)
+
+- New pages: **/members** (admin-only account list), **/members/new** (create
+  account), **/members/[id]** (edit fields + reset password). Home grid now has
+  a "Members & accounts" card; non-admins see the list read-only with a notice.
+- **Fields when creating a member**: full name*, mobile number* (their login
+  ID), temporary password* (min 8 chars, shown as text so it can be handed
+  over in person), family branch, role (member/coordinator/treasurer/admin),
+  birthday, wedding anniversary. Edit page exposes the same fields plus a
+  password reset (users keep signing in with their mobile).
+- Accounts are created server-side via the service-role admin API with the
+  shadow email `OFH-<91phone>@phone.invalid` and `email_confirm: true`; the
+  signup trigger builds the profile from user metadata. Profile-update failure
+  rolls the auth user back — no orphan logins. Duplicate mobiles are rejected
+  before creation; exactly one treasurer is enforced.
+- Birthday/anniversary dates drive recurring events automatically via the
+  `sync_recurring_events()` trigger (rows tagged `auto:` so manual meetups are
+  never touched).
+- Every create/update/password-reset writes to the append-only audit log
+  (`member.create`, `member.update`, `member.password_reset`).
+- Requires: apply `supabase/migrations/0009_admin_member_creation.sql` and set
+  `SUPABASE_SERVICE_ROLE_KEY` in the server environment (never NEXT_PUBLIC_*).
