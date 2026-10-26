@@ -2,7 +2,7 @@
 
 ## 1. One-time Supabase setup
 1. Create a project at supabase.com (Free tier is fine for ≤150 members).
-2. SQL Editor → run migrations **in order**: `0001_init.sql` … `0007_phone_login.sql`
+2. SQL Editor → run migrations **in order**: `0001_init.sql` … `0010_phone_login.sql`
    (or `supabase db push` with the CLI).
 3. Auth → Providers: keep Email enabled (it backs phone accounts). **Disable public
    sign-up**. Members log in with their registered **mobile number** (migration 0007).
@@ -61,7 +61,7 @@
 ## 5. Security checklist (verify before go-live)
 - [ ] All 7 migrations applied; `revoke` statements ran without error.
 - [ ] Public sign-up disabled; only registered mobiles/invited emails can create sessions.
-- [ ] Migration `0007_phone_login.sql` applied; one phone login tested end-to-end;
+- [ ] Migration `0010_phone_login.sql` applied; one phone login tested end-to-end;
       duplicate-phone registration rejected by the unique index.
 - [ ] Service-role key exists ONLY in server env (never in git, never NEXT_PUBLIC_*).
 - [ ] Spot-check RLS: signed-out request to `/directory` redirects; member cannot UPDATE

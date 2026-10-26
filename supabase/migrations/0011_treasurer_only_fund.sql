@@ -12,7 +12,9 @@
 -- 1) Exactly one active treasurer in the family
 -- ----------------------------------------------------------------------------
 create unique index if not exists profiles_single_treasurer_idx
-  on public.profiles (id) where role = 'treasurer';
+  on public.profiles ((role)) where role = 'treasurer';
+-- [hws fix] original indexed (id), which is always unique and so never limited
+-- the family to one treasurer.
 -- (Supabase deletes users via the admin API, which cascades profiles through
 --  the FK, so a deleted treasurer frees the slot automatically.)
 
@@ -20,16 +22,18 @@ create unique index if not exists profiles_single_treasurer_idx
 -- 2) Payment methods: cash | upi_online only
 -- ----------------------------------------------------------------------------
 alter table public.contributions alter column method drop default;
-delete from public.pg_depend
- where classid = 'pg_class'::regclass
-   and objid = 'public.payment_method'::regtype
-   and deptype = 'n';
-drop type public.payment_method;
+-- [hws fix] original deleted rows from "public.pg_depend" (no such table; a
+-- catalog hack) and dropped the type while contributions.method and
+-- declare_contribution() still used it. Do a safe rename/swap instead.
+-- (contributions had 0 rows when this was applied.)
+drop function if exists public.declare_contribution(bigint, text, public.payment_method, text);
+alter type public.payment_method rename to payment_method_old;
 create type public.payment_method as enum ('cash', 'upi_online');
 alter table public.contributions
   alter column method type public.payment_method using (
     case method::text when 'cash' then 'cash' else 'upi_online' end
   )::public.payment_method;
+drop type public.payment_method_old;
 alter table public.contributions alter column method set default 'upi_online';
 
 -- ----------------------------------------------------------------------------
@@ -241,3 +245,8 @@ begin
   return v_id;
 end $$;
 grant execute on function public.record_contribution_as_treasurer(uuid,bigint,text,public.payment_method,text) to authenticated;
+
+-- [hws fix] re-grant the recreated function to signed-in users only (0009 lockdown).
+revoke execute on function public.declare_contribution(bigint,text,public.payment_method,text) from public, anon;
+grant execute on function public.declare_contribution(bigint,text,public.payment_method,text) to authenticated;
+revoke execute on function public.record_contribution_as_treasurer(uuid,bigint,text,public.payment_method,text) from public, anon;

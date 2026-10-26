@@ -14,7 +14,7 @@
 -- ============================================================================
 create or replace function public.normalize_phone(p text)
 returns text
-language sql immutable as $$
+language sql immutable set search_path = '' as $$
   select case
     when p is null or btrim(p) = '' then null
     -- keep trailing 10 digits; prefix 91 unless already country-coded (starts 00/+91/9-10 w/ leading 9..? we use simple rule below)
@@ -39,18 +39,19 @@ create unique index if not exists profiles_phone_normalized_key
 --    value* ('unknown-phone@...') instead of NULL, plus rate limiting at the
 --    Supabase Auth layer (failed sign-ins are throttled project-wide).
 -- ============================================================================
+-- [hws fix] Original version looked up profiles as SECURITY DEFINER and was
+-- executable by public/anon, returning a different value for registered vs
+-- unregistered phones (member-enumeration oracle). The shadow email is fully
+-- deterministic from the phone, so compute it without touching any table.
+-- Unregistered phones simply fail sign-in with the same generic error.
 create or replace function public.shadow_email_for_phone(p text)
 returns text
-language sql stable security definer set search_path = public as $$
-  select coalesce(
-    (select 'OFH-' || e.phone_normalized || '@phone.invalid'
-       from public.profiles e
-      where e.phone_normalized = public.normalize_phone(p)),
-    'unknown-phone@phone.invalid');
+language sql immutable security invoker set search_path = '' as $$
+  select case when public.normalize_phone(p) is null then 'unknown-phone@phone.invalid'
+              else 'OFH-' || public.normalize_phone(p) || '@phone.invalid' end;
 $$;
--- Called from the pre-login Server Action (anon session), so anon+authenticated
--- may execute it; service_role also needs it for admin-created phone accounts.
-grant execute on function public.shadow_email_for_phone(text) to public, anon, authenticated, service_role;
+revoke execute on function public.shadow_email_for_phone(text) from public;
+grant execute on function public.shadow_email_for_phone(text) to anon, authenticated, service_role;
 
 -- ============================================================================
 -- 3. Keep auth.users.email in sync when a member's phone changes
@@ -118,3 +119,8 @@ drop trigger if exists phone_change_audit on public.profiles;
 create trigger phone_change_audit
   after update of phone on public.profiles
   for each row execute function public.log_phone_change();
+-- [hws fix] keep the 0009 lockdown: trigger/helper functions are not client-callable.
+revoke execute on function public.sync_phone_shadow_email() from public, anon, authenticated;
+revoke execute on function public.stamp_phone_shadow_email() from public, anon, authenticated;
+revoke execute on function public.log_phone_change() from public, anon, authenticated;
+revoke execute on function public.normalize_phone(text) from public, anon;

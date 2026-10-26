@@ -153,7 +153,7 @@ Or create the repo first on GitHub ("New repository" → *don't* initialize with
 - No multi-family tenancy; single family instance keeps RLS simple.
 
 ## Phase 10 — Mobile-number login ✅ built
-- Migration `0007_phone_login.sql`: `normalize_phone()` (last 10 digits, +91 canonical),
+- Migration `0010_phone_login.sql`: `normalize_phone()` (last 10 digits, +91 canonical),
   generated unique `phone_normalized` column, shadow-email resolver
   (`OFH-<phone>@phone.invalid`, RFC-reserved undeliverable domain), triggers to keep
   `auth.users.email` in sync for phone accounts only, and an audit entry on every
@@ -172,7 +172,7 @@ Per family decision: **only the treasurer records Mission Fund entries** (manual
 - Payment methods reduced to **Cash** or **UPI/Online** (`payment_method` enum migrated in 0008).
 - Bank reconciliation retired: statement functions revoked; `/reconcile` shows a retirement notice.
 - Flow now: treasurer records → *awaiting verification* → treasurer confirms receipt (UPI RRN / “CASH · voucher no.”) → *verified* (counted). Reversals remain append-only audited corrections.
-- Apply `supabase/migrations/0008_treasurer_only_fund.sql`, then set exactly one profile: `update profiles set role='treasurer' where id='<person>';` (their JWT app_metadata.role must be refreshed by re-login / claims hook).
+- Apply `supabase/migrations/0011_treasurer_only_fund.sql`, then set exactly one profile: `update profiles set role='treasurer' where id='<person>';` (their JWT app_metadata.role must be refreshed by re-login / claims hook).
 
 ## Change log — Admin member management (migration 0009, Oct 26 2026)
 
@@ -194,5 +194,5 @@ Per family decision: **only the treasurer records Mission Fund entries** (manual
   never touched).
 - Every create/update/password-reset writes to the append-only audit log
   (`member.create`, `member.update`, `member.password_reset`).
-- Requires: apply `supabase/migrations/0009_admin_member_creation.sql` and set
+- Requires: apply `supabase/migrations/0012_admin_member_creation.sql` and set
   `SUPABASE_SERVICE_ROLE_KEY` in the server environment (never NEXT_PUBLIC_*).
