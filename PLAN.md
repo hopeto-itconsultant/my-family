@@ -164,3 +164,12 @@ Or create the repo first on GitHub ("New repository" → *don't* initialize with
 - Profile editor: mobile number is now labeled as the sign-in credential, validated to
   10 digits, duplicates rejected by the unique index with a friendly message.
 - Runbook updated with phone-only account creation SQL (no real email required).
+
+## Change log — Treasurer-only Mission Fund (migration 0008, Oct 26 2026)
+Per family decision: **only the treasurer records Mission Fund entries** (manual only).
+- New `treasurer` is the single writer for contributions & expenses; enforced by RLS + SECURITY DEFINER checks. A partial unique index guarantees at most ONE active treasurer. Admins keep oversight but no longer touch money rows.
+- Everyone else: family-wide **view-only** of all fund records.
+- Payment methods reduced to **Cash** or **UPI/Online** (`payment_method` enum migrated in 0008).
+- Bank reconciliation retired: statement functions revoked; `/reconcile` shows a retirement notice.
+- Flow now: treasurer records → *awaiting verification* → treasurer confirms receipt (UPI RRN / “CASH · voucher no.”) → *verified* (counted). Reversals remain append-only audited corrections.
+- Apply `supabase/migrations/0008_treasurer_only_fund.sql`, then set exactly one profile: `update profiles set role='treasurer' where id='<person>';` (their JWT app_metadata.role must be refreshed by re-login / claims hook).

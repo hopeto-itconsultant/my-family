@@ -124,7 +124,13 @@ export type ContributionStatus =
   | 'rejected'
   | 'reversed';
 
-export type PaymentMethod = 'upi' | 'bank_transfer' | 'cash' | 'other';
+// Treasurer records payments manually as either cash or UPI/online (0008).
+export type PaymentMethod = 'cash' | 'upi_online';
+
+export const METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: '💵 Cash',
+  upi_online: '📱 UPI / Online',
+};
 
 export interface Contribution {
   id: string;

@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { requireProfile, getDirectory } from '@/lib/session';
 import { formatPaise } from '@/lib/money';
 import { getFundSummary, getContributions, getExpenses } from '@/app/actions/fund';
@@ -153,7 +152,7 @@ export default async function ReportsPage({
 
       <p className="text-xs text-stone-400">
         Figures come straight from the ledger views (verified contributions & paid expenses only).
-        Treasurer? Pair this with the <Link href="/reconcile" className="underline">bank reconciliation</Link> before publishing to the family group.
+        Entries are recorded manually by the treasurer; every figure here comes from verified/paid rows only.
       </p>
     </main>
   );

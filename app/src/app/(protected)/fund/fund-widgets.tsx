@@ -3,11 +3,12 @@
 import { useState, useTransition } from 'react';
 import { useOnline } from '@/components/pwa';
 import {
-  recordPayment, withdrawDeclaration, verifyContribution, rejectContribution,
-  reverseContribution, approveExpense, rejectExpense, reverseExpense, payExpense,
-  submitExpenseRequest, type ActionResult,
+  recordPayment, verifyContribution, rejectContribution, reverseContribution,
+  approveExpense, rejectExpense, reverseExpense, payExpense, submitExpenseRequest,
+  type ActionResult,
 } from '@/app/actions/fund';
-import type { Contribution, Expense, PaymentMethod } from '@/lib/types';
+import type { Contribution, Expense, PaymentMethod, ProfileWithBranch } from '@/lib/types';
+import { METHOD_LABELS } from '@/lib/types';
 import { formatPaise } from '@/lib/money';
 
 const inputCls = 'w-full rounded-xl ring-1 ring-stone-300 px-3 py-2.5 text-sm bg-white';
@@ -40,30 +41,29 @@ function ErrorNote({ result }: { result: ActionResult | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Record a bank/UPI payment (member). Saved as PENDING — never "received".
+// TREASURER ONLY: record a contribution on behalf of a member. Manual entry —
+// saved as PENDING until the treasurer confirms receipt and verifies it.
 // ---------------------------------------------------------------------------
-export function RecordPaymentSheet() {
+export function RecordPaymentSheet({ directory }: { directory: ProfileWithBranch[] }) {
   const { open, setOpen } = useSheet();
+  const [memberId, setMemberId] = useState('');
   const [amount, setAmount] = useState('');
   const [monthly, setMonthly] = useState(true);
-  const [method, setMethod] = useState<PaymentMethod>('upi');
-  const [ref, setRef] = useState('');
+  const [method, setMethod] = useState<PaymentMethod>('upi_online');
   const [note, setNote] = useState('');
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, start] = useTransition();
   const online = useOnline();
 
-  const monthRef = new Date().toISOString().slice(0, 7); // YYYY-MM (UTC ok for monthly pledge bucket)
+  const monthRef = new Date().toISOString().slice(0, 7); // YYYY-MM pledge bucket
 
   function submit() {
     setResult(null);
     start(async () => {
-      const res = await recordPayment({
-        amountRupees: amount, monthRef: monthly ? monthRef : '', method, referenceHint: ref, note,
-      });
+      const res = await recordPayment({ memberId, amountRupees: amount, monthRef: monthly ? monthRef : '', method, note });
       setResult(res);
       if (res.ok) {
-        setAmount(''); setRef(''); setNote('');
+        setMemberId(''); setAmount(''); setNote('');
         setTimeout(() => setOpen(false), 1200);
       }
     });
@@ -73,14 +73,21 @@ export function RecordPaymentSheet() {
     <>
       <button onClick={() => setOpen(true)}
         className="w-full rounded-xl bg-teal-700 text-white py-3 font-semibold active:bg-teal-800">
-        💰 Record my payment
+        ➕ Record a payment
       </button>
       {open && (
-        <Sheet title="Record a bank / UPI payment" onClose={() => setOpen(false)}>
+        <Sheet title="Record a contribution (manual)" onClose={() => setOpen(false)}>
           <p className="text-xs rounded-lg bg-amber-50 text-amber-900 ring-1 ring-amber-200 px-3 py-2">
-            Your entry goes to the treasurer as <b>pending verification</b>. It is visible to the family
-            but is <b>not counted in the balance</b> until the money appears in the bank statement.
+            New entries start as <b>awaiting verification</b> and are <b>not counted in the balance</b>{' '}
+            until you confirm the money was actually received (UPI credit seen, or cash counted).
           </p>
+          <label className="block text-xs font-medium text-stone-500">Who paid?</label>
+          <select value={memberId} onChange={(e) => setMemberId(e.target.value)} className={inputCls}>
+            <option value="">Select member…</option>
+            {directory.map((p) => (
+              <option key={p.id} value={p.id}>{p.full_name}{p.branches?.name ? ` · ${p.branches.name}` : ''}</option>
+            ))}
+          </select>
           <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal"
             placeholder="Amount ₹" className={inputCls} />
           <label className="flex items-center gap-2 text-sm">
@@ -88,19 +95,18 @@ export function RecordPaymentSheet() {
             Monthly contribution ({monthRef}) — untick for a voluntary gift
           </label>
           <div className="flex flex-wrap gap-2">
-            {(['upi', 'bank_transfer', 'cash', 'other'] as PaymentMethod[]).map((m) => (
+            {(Object.keys(METHOD_LABELS) as PaymentMethod[]).map((m) => (
               <button key={m} onClick={() => setMethod(m)}
-                className={`text-sm rounded-full px-3 py-1.5 ring-1 capitalize ${method === m ? 'bg-teal-700 text-white ring-teal-700' : 'bg-white text-stone-600 ring-stone-300'}`}>
-                {m.replace('_', ' ')}
+                className={`text-sm rounded-full px-3 py-1.5 ring-1 ${method === m ? 'bg-teal-700 text-white ring-teal-700' : 'bg-white text-stone-600 ring-stone-300'}`}>
+                {METHOD_LABELS[m]}
               </button>
             ))}
           </div>
-          <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="UPI/bank reference you saw (helps matching)" className={inputCls} maxLength={80} />
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200}
-            placeholder="Note (optional)" className={inputCls} />
+            placeholder="Note (optional) — e.g. paid by elder son on behalf" className={inputCls} />
           <ErrorNote result={result} />
-          {result?.ok && <p className="text-sm text-teal-700">Saved as pending ✓ awaiting treasurer verification.</p>}
-          <button onClick={submit} disabled={!online || amount.trim() === '' || isPending}
+          {result?.ok && <p className="text-sm text-teal-700">Saved ✓ now awaiting verification.</p>}
+          <button onClick={submit} disabled={!online || !memberId || amount.trim() === '' || isPending}
             className="w-full rounded-xl bg-teal-700 text-white py-3 font-semibold disabled:opacity-40">
             {isPending ? 'Saving…' : 'Save as pending'}
           </button>
@@ -111,7 +117,7 @@ export function RecordPaymentSheet() {
 }
 
 // ---------------------------------------------------------------------------
-// Treasurer: verify / reject / reverse a contribution
+// TREASURER: verify / reject / reverse a contribution
 // ---------------------------------------------------------------------------
 export function VerifyControls({ c, names }: { c: Contribution; names: Record<string, string> }) {
   const { open, setOpen } = useSheet();
@@ -121,8 +127,8 @@ export function VerifyControls({ c, names }: { c: Contribution; names: Record<st
   const [isPending, start] = useTransition();
   const online = useOnline();
 
-  const label = c.status === 'verified' ? 'Reverse verified payment'
-    : c.status === 'rejected' ? null : 'Review payment';
+  const label = c.status === 'verified' ? 'Reverse'
+    : c.status === 'rejected' || c.status === 'reversed' ? null : 'Review';
   if (!label) return null;
 
   function submit() {
@@ -140,30 +146,31 @@ export function VerifyControls({ c, names }: { c: Contribution; names: Record<st
   return (
     <>
       <button onClick={() => { setMode(c.status === 'verified' ? 'reverse' : 'verify'); setField(''); setOpen(true); }}
-        className="text-xs rounded-full bg-teal-700 text-white px-3 py-1.5">
+        className="text-xs rounded-full bg-teal-700 text-white px-3 py-1.5 shrink-0">
         {label}
       </button>
       {open && (
-        <Sheet title={`${names[c.member_id] ?? 'Member'} · ${formatPaise(c.amount_paise)}`} onClose={() => setOpen(false)}>
-          {c.note && <p className="text-sm text-stone-600">Member note: “{c.note}”</p>}
+        <Sheet title={`${names[c.member_id] ?? 'Member'} · ${formatPaise(c.amount_paise)} · ${METHOD_LABELS[c.method] ?? c.method}`} onClose={() => setOpen(false)}>
+          {c.note && <p className="text-sm text-stone-600">Note: “{c.note}”</p>}
           {c.bank_ref && <p className="text-sm text-stone-600">Stored ref: <code>{c.bank_ref}</code></p>}
           {c.status !== 'verified' && (
             <div className="flex gap-2">
-              <button onClick={() => setMode('verify')} className={`text-sm rounded-full px-3 py-1.5 ring-1 ${mode === 'verify' ? 'bg-teal-700 text-white ring-teal-700' : 'ring-stone-300'}`}>✔ Verify</button>
+              <button onClick={() => setMode('verify')} className={`text-sm rounded-full px-3 py-1.5 ring-1 ${mode === 'verify' ? 'bg-teal-700 text-white ring-teal-700' : 'ring-stone-300'}`}>✔ Confirm received</button>
               <button onClick={() => setMode('reject')} className={`text-sm rounded-full px-3 py-1.5 ring-1 ${mode === 'reject' ? 'bg-red-600 text-white ring-red-600' : 'ring-stone-300'}`}>✖ Reject</button>
             </div>
           )}
           <input value={field} onChange={(e) => setField(e.target.value)}
-            placeholder={mode === 'verify' ? 'Bank/UPI statement reference (required)'
+            placeholder={mode === 'verify' ? 'UPI RRN / bank ref, or “CASH · voucher no.”'
               : mode === 'reject' ? 'Reason for rejection' : 'Why is this reversal needed?'}
             className={inputCls} maxLength={200} />
           <p className="text-xs text-stone-500">
-            Only verify after seeing the money in the actual bank/UPI statement. This action is audited.
+            Only confirm after the money is actually in hand — UPI credit seen in the app/passbook,
+            or cash physically counted. This action is audited.
           </p>
           <ErrorNote result={result} />
           <button onClick={submit} disabled={!online || field.trim().length < 3 || isPending}
             className="w-full rounded-xl bg-stone-800 text-white py-3 font-semibold disabled:opacity-40">
-            {isPending ? 'Working…' : mode === 'verify' ? 'Confirm received' : mode === 'reject' ? 'Reject payment' : 'Record reversal'}
+            {isPending ? 'Working…' : mode === 'verify' ? 'Confirm received' : mode === 'reject' ? 'Reject entry' : 'Record reversal'}
           </button>
         </Sheet>
       )}
@@ -171,19 +178,8 @@ export function VerifyControls({ c, names }: { c: Contribution; names: Record<st
   );
 }
 
-export function WithdrawButton({ id }: { id: string }) {
-  const [isPending, start] = useTransition();
-  return (
-    <button disabled={isPending}
-      onClick={() => start(async () => { await withdrawDeclaration(id); })}
-      className="text-xs rounded-full ring-1 ring-stone-300 text-stone-600 px-3 py-1.5">
-      {isPending ? '…' : 'Withdraw'}
-    </button>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Expenses: request sheet (all members) + treasurer controls
+// Expenses: treasurer records + controls
 // ---------------------------------------------------------------------------
 export function ExpenseRequestSheet() {
   const { open, setOpen } = useSheet();
@@ -206,17 +202,17 @@ export function ExpenseRequestSheet() {
   return (
     <>
       <button onClick={() => setOpen(true)}
-        className="text-sm rounded-full ring-1 ring-stone-300 bg-white px-4 py-2">+ Request expense</button>
+        className="text-sm rounded-full ring-1 ring-stone-300 bg-white px-4 py-2">+ Record expense</button>
       {open && (
-        <Sheet title="Request a fund expense" onClose={() => setOpen(false)}>
-          <p className="text-xs text-stone-500">Goes to the treasurer for approval. Nothing is paid out until approved <i>and</i> a receipt is attached.</p>
+        <Sheet title="Record a fund expense" onClose={() => setOpen(false)}>
+          <p className="text-xs text-stone-500">Goes to your own approval queue. Nothing is paid out until approved <i>and</i> a receipt is attached.</p>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Hall booking for meet-up)" className={inputCls} maxLength={160} />
           <textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={2} maxLength={600} placeholder="Purpose / justification" className={inputCls} />
           <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="Amount ₹" className={inputCls} />
           <ErrorNote result={result} />
           <button onClick={submit} disabled={!online || !title.trim() || !amount.trim() || isPending}
             className="w-full rounded-xl bg-teal-700 text-white py-3 font-semibold disabled:opacity-40">
-            {isPending ? 'Submitting…' : 'Submit for approval'}
+            {isPending ? 'Saving…' : 'Save expense (awaiting approval)'}
           </button>
         </Sheet>
       )}
@@ -265,25 +261,25 @@ export function ExpenseControls({ e, names, receiptUrl }: { e: Expense; names: R
       )}
       {open && (
         <Sheet title={`${e.title} · ${formatPaise(e.amount_paise)}`} onClose={() => setOpen(false)}>
-          <p className="text-sm text-stone-600">Requested by {names[e.requested_by] ?? 'a member'}{e.purpose ? ` — ${e.purpose}` : ''}</p>
-          {mode === 'approve' && <p className="text-xs text-stone-500">Approval does not move money. Later payment requires a receipt + bank reference.</p>}
+          <p className="text-sm text-stone-600">Recorded by {names[e.requested_by] ?? 'treasurer'}{e.purpose ? ` — ${e.purpose}` : ''}</p>
+          {mode === 'approve' && <p className="text-xs text-stone-500">Approval does not move money. Later payment requires a receipt + reference.</p>}
           {(mode === 'reject' || mode === 'reverse') && (
             <input value={field} onChange={(ev) => setField(ev.target.value)} className={inputCls}
               placeholder={mode === 'reject' ? 'Reason for rejection' : 'Why reverse this payment?'} maxLength={200} />
           )}
           {mode === 'pay' && (
             <>
-              <input value={field} onChange={(ev) => setField(ev.target.value)} className={inputCls} placeholder="Outbound bank/UPI reference" maxLength={80} />
+              <input value={field} onChange={(ev) => setField(ev.target.value)} className={inputCls} placeholder="Outbound UPI/bank ref, or “CASH”" maxLength={80} />
               <input type="file" accept="image/*,application/pdf" className={inputCls}
                 onChange={(ev) => setFile(ev.target.files?.[0] ?? null)} />
-              <p className="text-xs text-stone-500">Receipt is stored in private storage; only treasurers can upload/manage it.</p>
+              <p className="text-xs text-stone-500">Receipt is stored in private storage; only the treasurer can upload/manage it.</p>
             </>
           )}
           <ErrorNote result={result} />
           <button onClick={submit}
             disabled={!online || ((mode !== 'approve') && field.trim().length < 3)}
             className="w-full rounded-xl bg-stone-800 text-white py-3 font-semibold disabled:opacity-40">
-            {isPending ? 'Working…' : mode === 'approve' ? 'Approve request' : mode === 'reject' ? 'Reject' : mode === 'pay' ? 'Mark paid' : 'Record reversal'}
+            {isPending ? 'Working…' : mode === 'approve' ? 'Approve expense' : mode === 'reject' ? 'Reject' : mode === 'pay' ? 'Mark paid' : 'Record reversal'}
           </button>
         </Sheet>
       )}
