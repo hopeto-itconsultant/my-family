@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { updateMember, resetMemberPassword } from '@/app/actions/members';
+import { formatNicknames } from '@/lib/nicknames';
 import type { Branch, FamilyRole, Profile } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
 
@@ -40,6 +41,12 @@ export function EditMemberForm({
         <label className={labelCls} htmlFor="full_name">Full name *</label>
         <input id="full_name" name="full_name" required defaultValue={member.full_name} className={inputCls} />
 
+        <label className={labelCls} htmlFor="nicknames">Nicknames / pet names</label>
+        <input id="nicknames" name="nicknames" className={inputCls}
+          defaultValue={formatNicknames(member.nicknames)}
+          placeholder="comma-separated, e.g. Appa, Annachi, Kanna" />
+        <p className="text-xs text-stone-500 mt-1">Separate multiple names with commas (max 10).</p>
+
         <label className={labelCls} htmlFor="phone">Mobile number (login ID)</label>
         <input id="phone" name="phone" inputMode="numeric" pattern="[0-9 +\-]{10,15}"
           defaultValue={member.phone ?? ''} className={inputCls} />
@@ -62,8 +69,17 @@ export function EditMemberForm({
           ))}
         </select>
 
-        <label className={labelCls} htmlFor="birth_date">Birthday</label>
-        <input id="birth_date" name="birth_date" type="date" defaultValue={member.birth_date ?? ''} className={inputCls} />
+        <label className={labelCls} htmlFor="birth_date">Full birth date</label>
+        <input id="birth_date" name="birth_date" type="date" defaultValue={member.birth_date ?? ''} className={inputCls} max={new Date().toISOString().slice(0, 10)} />
+
+        <label className={labelCls} htmlFor="birth_year">Birth year</label>
+        <input id="birth_year" name="birth_year" inputMode="numeric" pattern="\d{4}" maxLength={4}
+          defaultValue={member.birth_year ?? (member.birth_date ? member.birth_date.slice(0, 4) : '')}
+          className={inputCls} placeholder="e.g. 1948 — use when only the year is known" />
+        <p className="text-xs text-stone-500 mt-1">If the full date is given, the year is taken from it automatically.</p>
+
+        <label className={labelCls} htmlFor="date_of_death">Date of death</label>
+        <input id="date_of_death" name="date_of_death" type="date" defaultValue={member.date_of_death ?? ''} className={inputCls} />
 
         <label className={labelCls} htmlFor="anniversary_date">Wedding anniversary</label>
         <input id="anniversary_date" name="anniversary_date" type="date" defaultValue={member.anniversary_date ?? ''} className={inputCls} />

@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { createMember } from '@/app/actions/members';
+import { formatNicknames } from '@/lib/nicknames';
 import type { Branch, FamilyRole } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
 
@@ -25,6 +26,10 @@ export function NewMemberForm({ branches }: { branches: Branch[] }) {
 
       <label className={labelCls} htmlFor="full_name">Full name *</label>
       <input id="full_name" name="full_name" required autoComplete="name" className={inputCls} placeholder="e.g. Ravi Kumar" />
+
+      <label className={labelCls} htmlFor="nicknames">Nicknames / pet names</label>
+      <input id="nicknames" name="nicknames" className={inputCls} placeholder="comma-separated, e.g. Appa, Annachi, Kanna" />
+      <p className="text-xs text-stone-500 mt-1">Separate multiple names with commas (max 10).</p>
 
       <label className={labelCls} htmlFor="phone">Mobile number (login ID) *</label>
       <input id="phone" name="phone" required inputMode="numeric" pattern="[0-9 +\-]{10,15}" className={inputCls} placeholder="10-digit number" />
@@ -50,8 +55,15 @@ export function NewMemberForm({ branches }: { branches: Branch[] }) {
         ))}
       </select>
 
-      <label className={labelCls} htmlFor="birth_date">Birthday (optional)</label>
-      <input id="birth_date" name="birth_date" type="date" className={inputCls} />
+      <label className={labelCls} htmlFor="birth_date">Full birth date (optional)</label>
+      <input id="birth_date" name="birth_date" type="date" className={inputCls} max={new Date().toISOString().slice(0, 10)} />
+
+      <label className={labelCls} htmlFor="birth_year">Birth year (optional)</label>
+      <input id="birth_year" name="birth_year" inputMode="numeric" pattern="\d{4}" maxLength={4} className={inputCls} placeholder="e.g. 1948 — use when only the year is known" />
+      <p className="text-xs text-stone-500 mt-1">If the full date is given, the year is taken from it automatically.</p>
+
+      <label className={labelCls} htmlFor="date_of_death">Date of death (optional)</label>
+      <input id="date_of_death" name="date_of_death" type="date" className={inputCls} />
 
       <label className={labelCls} htmlFor="anniversary_date">Wedding anniversary (optional)</label>
       <input id="anniversary_date" name="anniversary_date" type="date" className={inputCls} />

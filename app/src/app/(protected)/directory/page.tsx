@@ -15,6 +15,7 @@ export default async function DirectoryPage({
     ? all.filter(
         (p) =>
           p.full_name.toLowerCase().includes(query) ||
+          (p.nicknames ?? []).some((n) => n.toLowerCase().includes(query)) ||
           (p.branches?.name ?? '').toLowerCase().includes(query),
       )
     : all;
@@ -54,11 +55,17 @@ export default async function DirectoryPage({
                   {m.full_name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{m.full_name}</div>
+                  <div className="font-semibold truncate">
+                    {m.full_name}
+                    {m.date_of_death ? ' ✝' : ''}
+                  </div>
                   <div className="text-xs text-stone-500">
                     {ROLE_LABELS[m.role]}
                     {m.phone ? ` · ${m.phone}` : ''}
                   </div>
+                  {(m.nicknames?.length ?? 0) > 0 && (
+                    <div className="text-xs text-stone-400 truncate italic">“{m.nicknames!.join(', ')}”</div>
+                  )}
                 </div>
               </li>
             ))}

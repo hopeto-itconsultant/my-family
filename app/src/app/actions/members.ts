@@ -5,9 +5,41 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone, tenDigits } from '@/lib/phone';
+import { parseNicknames } from '@/lib/nicknames';
 import type { FamilyRole } from '@/lib/types';
 
 export type MemberFormState = { ok: boolean; error?: string };
+
+/** Shared extraction/validation of the new profile fields (migration 0010). */
+function readLifeFields(formData: FormData): {
+  error?: string;
+  nicknames: string[] | null;
+  birthDate: string | null;
+  birthYear: number | null;
+  dateOfDeath: string | null;
+} {
+  const nicknames = parseNicknames(String(formData.get('nicknames') ?? ''));
+  const birthDate = validDate(String(formData.get('birth_date') ?? ''));
+  const dateOfDeath = validDate(String(formData.get('date_of_death') ?? ''));
+  const yearRaw = String(formData.get('birth_year') ?? '').trim();
+  let birthYear: number | null = null;
+  if (yearRaw) {
+    if (!/^\d{4}$/.test(yearRaw)) return { error: 'Birth year must be a 4-digit year.', nicknames, birthDate, birthYear, dateOfDeath };
+    birthYear = Number(yearRaw);
+    if (birthYear < 1850 || birthYear > new Date().getFullYear())
+      return { error: 'Birth year must be between 1850 and this year.', nicknames, birthDate, birthYear, dateOfDeath };
+  }
+  // Client-side mirror of the DB trigger's consistency check.
+  if (birthDate && birthYear && birthDate.slice(0, 4) !== String(birthYear))
+    return { error: 'Birth year does not match the full birth date entered.', nicknames, birthDate, birthYear, dateOfDeath };
+  if (birthDate && !birthYear) birthYear = Number(birthDate.slice(0, 4));
+  if (dateOfDeath) {
+    const refYear = birthDate ? Number(birthDate.slice(0, 4)) : birthYear;
+    if (refYear && Number(dateOfDeath.slice(0, 4)) < refYear)
+      return { error: 'Date of death cannot be before the birth year.', nicknames, birthDate, birthYear, dateOfDeath };
+  }
+  return { nicknames: nicknames.length ? nicknames : null, birthDate, birthYear, dateOfDeath };
+}
 
 const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'coordinator', 'treasurer', 'admin'];
 
@@ -49,8 +81,8 @@ export async function createMember(
   const rawPhone = String(formData.get('phone') ?? '').trim();
   const branchId = String(formData.get('branch_id') ?? '');
   const role = String(formData.get('role') ?? 'member') as FamilyRole;
-  const birthDate = validDate(String(formData.get('birth_date') ?? ''));
-  const anniversaryDate = validDate(String(formData.get('anniversary_date') ?? ''));
+  const life = readLifeFields(formData);
+  if (life.error) return { ok: false, error: life.error };
   const tempPassword = String(formData.get('temp_password') ?? '');
 
   if (!fullName) return { ok: false, error: 'Full name is required.' };
@@ -118,8 +150,11 @@ export async function createMember(
       phone,
       branch_id: branchId || null,
       role,
-      birth_date: birthDate,
-      anniversary_date: anniversaryDate,
+      birth_date: life.birthDate,
+      birth_year: life.birthYear,
+      anniversary_date: validDate(String(formData.get('anniversary_date') ?? '')),
+      nicknames: life.nicknames,
+      date_of_death: life.dateOfDeath,
     })
     .eq('id', uid);
   if (profErr) {
@@ -159,8 +194,8 @@ export async function updateMember(
   const rawPhone = String(formData.get('phone') ?? '').trim();
   const branchId = String(formData.get('branch_id') ?? '');
   const role = String(formData.get('role') ?? 'member') as FamilyRole;
-  const birthDate = validDate(String(formData.get('birth_date') ?? ''));
-  const anniversaryDate = validDate(String(formData.get('anniversary_date') ?? ''));
+  const life = readLifeFields(formData);
+  if (life.error) return { ok: false, error: life.error };
 
   if (!id) return { ok: false, error: 'Missing member.' };
   if (!fullName) return { ok: false, error: 'Full name is required.' };
@@ -188,8 +223,11 @@ export async function updateMember(
       phone: rawPhone ? normalizePhone(rawPhone) : null,
       branch_id: branchId || null,
       role,
-      birth_date: birthDate,
-      anniversary_date: anniversaryDate,
+      birth_date: life.birthDate,
+      birth_year: life.birthYear,
+      anniversary_date: validDate(String(formData.get('anniversary_date') ?? '')),
+      nicknames: life.nicknames,
+      date_of_death: life.dateOfDeath,
     })
     .eq('id', id);
   if (error) {

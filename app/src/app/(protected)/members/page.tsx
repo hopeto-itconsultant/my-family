@@ -31,7 +31,13 @@ export default async function MembersPage() {
         {people.map((m) => (
           <li key={m.id} className="rounded-xl bg-white ring-1 ring-stone-200 p-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-medium truncate">{m.full_name}</p>
+              <p className="font-medium truncate">
+                {m.full_name}
+                {m.date_of_death ? ' ✝' : ''}
+              </p>
+              {(m.nicknames?.length ?? 0) > 0 && (
+                <p className="text-xs text-stone-400 truncate italic">“{m.nicknames!.join(', ')}”</p>
+              )}
               <p className="text-xs text-stone-500 truncate">
                 {m.phone ?? 'no mobile'} · {m.branches?.name ?? 'Unassigned'} · {ROLE_LABELS[m.role]}
               </p>
