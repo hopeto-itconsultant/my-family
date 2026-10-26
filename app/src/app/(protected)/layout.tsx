@@ -10,7 +10,8 @@ const TABS = [
   { href: '/events', label: 'Events', icon: '🎂' },
   { href: '/fund', label: 'Mission Fund', icon: '💛' },
   { href: '/reports', label: 'Reports', icon: '📊' },
-  { href: '/home', label: 'Me', icon: '🙂' },
+  { href: "/units", label: "Groups", icon: "🧩" },
+  { href: "/home", label: "Me", icon: "🙂" },
 ];
 
 export default async function ProtectedLayout({

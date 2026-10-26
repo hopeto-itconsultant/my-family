@@ -29,7 +29,7 @@ export function NavigationShell({
 
       <nav
         aria-label="Primary"
-        className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-stone-200 grid grid-cols-6 pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-stone-200 grid grid-cols-7 pb-[env(safe-area-inset-bottom)]"
       >
         {tabs.map((t) => {
           const active =
