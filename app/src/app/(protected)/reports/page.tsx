@@ -35,10 +35,12 @@ export default async function ReportsPage({
   const nameOf = new Map(directory.map((p) => [p.id, p.full_name]));
   const branchOf = new Map(directory.map((p) => [p.id, p.branches?.name ?? '—']));
 
-  // In-month flows use the ledger's own timestamps: declared_at / created_at.
-  const inMonth = (iso: string) => iso.slice(0, 7) === monthRef;
-  const monthIn = contributions.filter((c) => c.status === 'verified' && inMonth(c.declared_at));
-  const monthOut = expenses.filter((e) => e.status === 'paid' && e.paid_at && inMonth(e.paid_at));
+  // In-month flows use the ledger's own timestamps: verified_at / paid_at.
+  // Both are nullable in the schema, so guard against null/undefined rows —
+  // an unguarded .slice() here used to crash the whole page into an error screen.
+  const inMonth = (iso: string | null | undefined) => !!iso && iso.slice(0, 7) === monthRef;
+  const monthIn = contributions.filter((c) => c.status === 'verified' && inMonth(c.verified_at ?? c.declared_at));
+  const monthOut = expenses.filter((e) => e.status === 'paid' && inMonth(e.paid_at));
   // Pledge-period view: everything declared FOR this month, regardless of when money moved.
   const pledgedFor = contributions.filter((c) => c.month_ref === monthRef);
   const pledgedVerified = pledgedFor.filter((c) => c.status === 'verified');

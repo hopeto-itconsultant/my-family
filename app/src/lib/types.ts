@@ -130,7 +130,7 @@ export interface Contribution {
   id: string;
   member_id: string;
   amount_paise: number;
-  month_ref: string; // YYYY-MM (null for voluntary gifts)
+  month_ref: string | null; // YYYY-MM pledge period (null = voluntary gift)
   method: PaymentMethod;
   status: ContributionStatus;
   bank_ref: string | null;
