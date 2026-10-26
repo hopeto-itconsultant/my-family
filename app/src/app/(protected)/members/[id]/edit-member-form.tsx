@@ -7,7 +7,7 @@ import { formatNicknames } from '@/lib/nicknames';
 import type { Branch, FamilyRole, Profile } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
 
-const ROLES: FamilyRole[] = ['member', 'coordinator', 'treasurer', 'admin'];
+const ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
 
 const inputCls =
   'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-600';

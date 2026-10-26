@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, canManage } from '@/lib/session';
 import type { RelationKind } from '@/lib/types';
@@ -11,7 +11,7 @@ export interface ActionResult {
 }
 
 /**
- * Add a relation edge. RLS is the real gate (coordinators+ only); this check
+ * Add a relation edge. RLS is the real gate (stewards only); this check
  * merely gives a friendly error before hitting the database.
  * For kind='parent' we store from = child, to = parent (schema convention).
  */
@@ -23,7 +23,7 @@ export async function addRelation(input: {
   childIsA?: boolean;
 }): Promise<ActionResult> {
   const profile = await requireProfile();
-  if (!canManage(profile)) return { ok: false, error: 'Only coordinators and admins can edit the family tree.' };
+  if (!canManage(profile)) return { ok: false, error: 'Only the treasurer and admins can edit the family tree.' };
 
   const { a, b, kind } = input;
   if (!a || !b) return { ok: false, error: 'Choose two different members.' };
@@ -50,15 +50,17 @@ export async function addRelation(input: {
     return { ok: false, error: 'Could not save the relation (permission or validation).' };
   }
   revalidatePath('/tree');
+  updateTag('tree');
   return { ok: true };
 }
 
 export async function deleteRelation(id: string): Promise<ActionResult> {
   const profile = await requireProfile();
-  if (!canManage(profile)) return { ok: false, error: 'Only coordinators and admins can edit the family tree.' };
+  if (!canManage(profile)) return { ok: false, error: 'Only the treasurer and admins can edit the family tree.' };
   const supabase = await createClient();
   const { error } = await supabase.from('family_relations').delete().eq('id', id);
   if (error) return { ok: false, error: 'Could not remove the relation.' };
   revalidatePath('/tree');
+  updateTag('tree');
   return { ok: true };
 }

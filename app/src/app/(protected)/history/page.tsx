@@ -106,7 +106,7 @@ export default async function HistoryPage() {
         <h2 className="font-semibold text-stone-800">Assets register</h2>
         {others.length === 0 && (
           <p className="text-sm text-stone-500 rounded-xl bg-white ring-1 ring-stone-200 p-4">
-            Property, jewellery and shared items appear here. Only coordinators can edit this register.
+            Property, jewellery and shared items appear here. Only the treasurer can edit this register.
           </p>
         )}
         {others.map((a) => <AssetCard key={a.id} a={a} ownerName={ownerName(a, directory, branches ?? [])} />)}

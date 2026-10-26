@@ -1,13 +1,16 @@
 import { redirect } from 'next/navigation';
+import { getCachedDirectory, getCachedBranches, getCachedRelations, getCachedUpcomingEvents } from '@/lib/cached';
 import { createClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/env';
 import type { Branch, FamilyEvent, FamilyRelation, Profile, ProfileWithBranch } from '@/lib/types';
 
 export type SessionUser = NonNullable<Awaited<ReturnType<typeof getSession>>['profile']>;
 
-/** Roles that may maintain the tree / schedule events (mirrors RLS). */
+/** Steward roles (post-merge of coordinator into treasurer — migration 0015):
+ * treasurers manage the tree/events/history AND record every Mission Fund
+ * entry manually; admins keep oversight. Mirrors RLS (`is_steward()`). */
 export function canManage(rel: Pick<Profile, 'role'>): boolean {
-  return rel.role === 'coordinator' || rel.role === 'treasurer' || rel.role === 'admin';
+  return rel.role === 'treasurer' || rel.role === 'admin';
 }
 
 /** Server-side session helper used by every protected page. */
@@ -35,54 +38,25 @@ export async function requireProfile(): Promise<Profile> {
   return profile;
 }
 
+/** Directory — per-request only. The cookie session cannot be read inside
+ * `unstable_cache`, and RLS makes the rows user-scoped. */
 export async function getDirectory(): Promise<ProfileWithBranch[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*, branches ( id, name )')
-    .order('full_name');
-  if (error || !data) return [];
-  return data as unknown as ProfileWithBranch[];
+  return getCachedDirectory();
 }
 
-/** All family branches (RLS: readable by any signed-in relative). */
+/** All family branches visible to this member (per-request). */
 export async function getBranches(): Promise<Branch[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('branches')
-    .select('id, name, order_hint')
-    .order('order_hint');
-  if (error || !data) return [];
-  return data as Branch[];
+  return getCachedBranches();
 }
 
-/** All relation edges (RLS: readable by any signed-in relative). */
+/** Relation edges for this member (per-request). */
 export async function getRelations(): Promise<FamilyRelation[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('family_relations')
-    .select('id, from_member, to_member, kind');
-  if (error || !data) return [];
-  return data as FamilyRelation[];
+  return getCachedRelations();
 }
 
-/** Upcoming events within the next `days` days (plus anything undated-past for meetups). */
+/** Upcoming events window for this member (per-request). */
 export async function getUpcomingEvents(days = 45): Promise<FamilyEvent[]> {
-  const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
-  const until = (() => {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() + days);
-    return d.toISOString().slice(0, 10);
-  })();
-  const { data, error } = await supabase
-    .from('events')
-    .select('id, kind, title, occurs_on, member_id, branch_id, venue, notes')
-    .gte('occurs_on', today)
-    .lte('occurs_on', until)
-    .order('occurs_on');
-  if (error || !data) return [];
-  return data as FamilyEvent[];
+  return getCachedUpcomingEvents(days);
 }
 
 /** In-app reminders for the signed-in member (RLS: only own rows are visible). */

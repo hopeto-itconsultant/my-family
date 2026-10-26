@@ -38,6 +38,7 @@ export default async function HomePage() {
         <FeatureCard href="/prayers" icon="🙏" title="Prayers & achievements" desc="Share & celebrate" ready />
         <FeatureCard href="/history" icon="📜" title="History & photos" desc="Stories, albums, assets" ready />
         <FeatureCard href="/reports" icon="📊" title="Fund reports" desc="Monthly statement · print/PDF" ready />
+        <FeatureCard href="/units" icon="🧩" title="Branches & groups" desc="My memberships, committees" ready />
         <AdminCard />
         <FeatureCard href="/home" icon="🙂" title="My profile" desc="Name, phone, role" ready />
       </section>

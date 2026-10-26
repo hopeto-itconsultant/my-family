@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { NavigationShell } from './navigation-shell';
 import { requireProfile, getMyNotifications } from '@/lib/session';
 import { ROLE_LABELS } from '@/lib/types';
 
@@ -9,7 +10,8 @@ const TABS = [
   { href: '/events', label: 'Events', icon: '🎂' },
   { href: '/fund', label: 'Mission Fund', icon: '💛' },
   { href: '/reports', label: 'Reports', icon: '📊' },
-  { href: '/home', label: 'Me', icon: '🙂' },
+  { href: "/units", label: "Groups", icon: "🧩" },
+  { href: "/home", label: "Me", icon: "🙂" },
 ];
 
 export default async function ProtectedLayout({
@@ -42,23 +44,7 @@ export default async function ProtectedLayout({
         </div>
       </header>
 
-      <main className="flex-1 pb-24">{children}</main>
-
-      <nav
-        aria-label="Primary"
-        className="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-stone-200 grid grid-cols-6 pb-[env(safe-area-inset-bottom)]"
-      >
-        {TABS.map((t) => (
-          <Link
-            key={t.href}
-            href={t.href}
-            className="flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-stone-600 active:text-teal-700"
-          >
-            <span className="text-xl leading-none" aria-hidden>{t.icon}</span>
-            {t.label}
-          </Link>
-        ))}
-      </nav>
+      <NavigationShell tabs={TABS}>{children}</NavigationShell>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use server';
 
+import { revalidatePath, updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone, tenDigits } from '@/lib/phone';
@@ -9,6 +9,25 @@ import { parseNicknames } from '@/lib/nicknames';
 import type { FamilyRole } from '@/lib/types';
 
 export type MemberFormState = { ok: boolean; error?: string };
+
+/** Only an admin may manage accounts. Checked against the DB row (source of
+ *  truth), not just the JWT claim. Shared with the roster importer. */
+export async function requireAdminCtx() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: me } = await supabase
+    .from('profiles')
+    .select('role, full_name')
+    .eq('id', user.id)
+    .single();
+  if (!me || me.role !== 'admin') return null;
+  return { supabase, actorId: user.id };
+}
+
+const requireAdmin = requireAdminCtx;
 
 /** Shared extraction/validation of the new profile fields (migration 0010). */
 function readLifeFields(formData: FormData): {
@@ -41,24 +60,9 @@ function readLifeFields(formData: FormData): {
   return { nicknames: nicknames.length ? nicknames : null, birthDate, birthYear, dateOfDeath };
 }
 
-const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'coordinator', 'treasurer', 'admin'];
-
-/** Only an admin may manage accounts. Checked against the DB row (source of
- *  truth), not just the JWT claim. */
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: me } = await supabase
-    .from('profiles')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .single();
-  if (!me || me.role !== 'admin') return null;
-  return { supabase, actorId: user.id };
-}
+// Coordinator was merged into Treasurer (migration 0015): one steward role
+// manages the family app AND records all Mission Fund entries manually.
+const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
 
 function validDate(s: string): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
@@ -93,19 +97,6 @@ export async function createMember(
     return { ok: false, error: 'Temporary password must be at least 8 characters.' };
 
   const admin = createAdminClient();
-
-  if (role === 'treasurer') {
-    const { data: existing } = await admin
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'treasurer')
-      .maybeSingle();
-    if (existing)
-      return {
-        ok: false,
-        error: `A treasurer is already assigned (${existing.full_name}). Change that person's role first.`,
-      };
-  }
 
   const phone = normalizePhone(rawPhone)!;
   const { data: dup } = await admin
@@ -177,6 +168,7 @@ export async function createMember(
   });
 
   revalidatePath('/directory');
+  updateTag('directory');
   revalidatePath('/members');
   redirect('/members?created=1');
 }
@@ -203,16 +195,9 @@ export async function updateMember(
     return { ok: false, error: 'Phone must be a 10-digit mobile number.' };
   if (!ASSIGNABLE_ROLES.includes(role)) return { ok: false, error: 'Invalid role.' };
 
-  const admin = createAdminClient();
-  if (role === 'treasurer') {
-    const { data: existing } = await admin
-      .from('profiles')
-      .select('id')
-      .eq('role', 'treasurer')
-      .neq('id', id)
-      .maybeSingle();
-    if (existing) return { ok: false, error: 'Another member is already the treasurer.' };
-  }
+  // Multiple treasurers/stewards are allowed since migration 0015
+  // (coordinator merged into treasurer); every role change is audited by the
+  // profile trigger, so no app-level single-treasurer guard is needed here.
 
   // Runs under RLS (migration 0009 allows treasurer/admin updates); the DB
   // guard trigger audits the change and blocks invalid role edits.
@@ -239,6 +224,7 @@ export async function updateMember(
     };
   }
 
+  const admin = createAdminClient();
   await admin.rpc('log_audit', {
     p_actor: ctx.actorId,
     p_action: 'member.update',
@@ -248,6 +234,7 @@ export async function updateMember(
   });
 
   revalidatePath('/directory');
+  updateTag('directory');
   revalidatePath('/members');
   redirect(`/members/${id}?saved=1`);
 }

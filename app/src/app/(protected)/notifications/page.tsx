@@ -14,7 +14,7 @@ export default async function NotificationsPage() {
       </div>
       <p className="text-xs text-stone-500">
         Generated nightly by the family scheduler — birthdays & anniversaries coming up, branch
-        meetups for coordinators, and a monthly Mission Fund nudge. Only you can see yours.
+        meetups for stewards (treasurers), and a monthly Mission Fund nudge. Only you can see yours.
       </p>
       {items.length === 0 ? (
         <div className="rounded-2xl bg-white ring-1 ring-stone-200 p-6 text-center text-sm text-stone-500">
