@@ -14,6 +14,8 @@ export interface Profile {
   role: FamilyRole;
   phone: string | null;
   avatar_url: string | null;
+  birth_date?: string | null;       // 'YYYY-MM-DD' (migration 0009)
+  anniversary_date?: string | null; // 'YYYY-MM-DD' (migration 0009)
   created_at: string;
   updated_at: string;
 }

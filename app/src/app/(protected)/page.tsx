@@ -38,10 +38,16 @@ export default async function HomePage() {
         <FeatureCard href="/prayers" icon="🙏" title="Prayers & achievements" desc="Share & celebrate" ready />
         <FeatureCard href="/history" icon="📜" title="History & photos" desc="Stories, albums, assets" ready />
         <FeatureCard href="/reports" icon="📊" title="Fund reports" desc="Monthly statement · print/PDF" ready />
-        <FeatureCard href="/fund" icon="💛" title="Mission Fund" desc="Treasurer-recorded entries, family-visible" ready />
+        <AdminCard />
         <FeatureCard href="/home" icon="🙂" title="My profile" desc="Name, phone, role" ready />
       </section>
     </div>
+  );
+}
+
+function AdminCard() {
+  return (
+    <FeatureCard href="/members" icon="🪪" title="Members & accounts" desc="Admin: add relatives, roles, resets" ready />
   );
 }
 
