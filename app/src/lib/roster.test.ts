@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { parseRoster, mapRosterCells, duplicateNames } from './roster';
+import { defaultMemberPassword } from './default-password';
 
 test('textual birthday with year → full date + birth_year', () => {
   const r = mapRosterCells(['7 September 1984', 'Hopeto', '', '8837306849']);
@@ -10,6 +11,10 @@ test('textual birthday with year → full date + birth_year', () => {
   assert.equal(r.birth_date, '1984-09-07');
   assert.equal(r.birth_year, 1984);
   assert.equal(r.birthday_hint, null);
+  assert.equal(
+    defaultMemberPassword(r.full_name, { birthDate: r.birth_date, birthdayHint: r.birthday_hint }),
+    'H@0709',
+  );
 });
 
 test('birthday without year → MM-DD hint only, no invented year', () => {
@@ -18,6 +23,10 @@ test('birthday without year → MM-DD hint only, no invented year', () => {
   assert.equal(r.birth_date, null);
   assert.equal(r.birth_year, null);
   assert.equal(r.birthday_hint, '07-31');
+  assert.equal(
+    defaultMemberPassword(r.full_name, { birthDate: r.birth_date, birthdayHint: r.birthday_hint }),
+    'A@3107',
+  );
 });
 
 test('nicknames are split, trimmed and deduped', () => {

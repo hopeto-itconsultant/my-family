@@ -2,12 +2,27 @@
 
 import { useActionState } from 'react';
 import Link from 'next/link';
-import { updateMember, resetMemberPassword } from '@/app/actions/members';
+import { updateMember, resetMemberPassword, linkDirectoryAccount } from '@/app/actions/members';
+import { IssuedPassword } from '@/components/issued-password';
 import { formatNicknames } from '@/lib/nicknames';
+import {
+  DEFAULT_PASSWORD_RULE,
+  MIN_AUTH_PASSWORD_LENGTH,
+  defaultMemberPassword,
+} from '@/lib/default-password';
 import type { Branch, FamilyRole, Profile } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
 
 const ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
+
+/** '2000-07-31' or '07-31' → '31/07' (day/month). */
+function dayMonthLabel(hint: string): string {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(hint);
+  if (iso) return `${iso[3]}/${iso[2]}`;
+  const md = /^(\d{1,2})-(\d{1,2})$/.exec(hint);
+  if (md) return `${md[2].padStart(2, '0')}/${md[1].padStart(2, '0')}`;
+  return hint;
+}
 
 const inputCls =
   'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-600';
@@ -16,12 +31,20 @@ const labelCls = 'block text-xs font-semibold uppercase tracking-wide text-stone
 export function EditMemberForm({
   member,
   branches,
+  needsLogin,
 }: {
   member: Profile;
   branches: Branch[];
+  /** Directory-only relative: no auth user yet, so linking creates the login. */
+  needsLogin: boolean;
 }) {
   const [state, action, pending] = useActionState(updateMember, null);
   const [pwState, pwAction, pwPending] = useActionState(resetMemberPassword, null);
+  const [linkState, linkAction, linkPending] = useActionState(linkDirectoryAccount, null);
+  const standard = defaultMemberPassword(member.full_name, {
+    birthDate: member.birth_date,
+    birthdayHint: member.birthday_hint,
+  });
 
   return (
     <div className="space-y-6">
@@ -71,6 +94,12 @@ export function EditMemberForm({
 
         <label className={labelCls} htmlFor="birth_date">Full birth date</label>
         <input id="birth_date" name="birth_date" type="date" defaultValue={member.birth_date ?? ''} className={inputCls} max={new Date().toISOString().slice(0, 10)} />
+        {!member.birth_date && member.birthday_hint ? (
+          <p className="text-xs text-stone-500 mt-1">
+            Day and month on file, year unknown: {dayMonthLabel(member.birthday_hint)} (day/month).
+            The standard password uses that. Save a full birth date here if you learn the year.
+          </p>
+        ) : null}
 
         <label className={labelCls} htmlFor="birth_year">Birth year</label>
         <input id="birth_year" name="birth_year" inputMode="numeric" pattern="\d{4}" maxLength={4}
@@ -98,29 +127,117 @@ export function EditMemberForm({
         </div>
       </form>
 
-      <section className="rounded-xl bg-white ring-1 ring-stone-200 p-4">
-        <h2 className="font-semibold text-sm">Reset password</h2>
-        <p className="text-xs text-stone-500 mt-1 mb-2">
-          Give them a new temporary password. They still sign in with their mobile number.
-        </p>
-        <form action={pwAction} className="space-y-2">
-          <input type="hidden" name="id" value={member.id} />
-          {pwState?.error && (
-            <p role="alert" className="rounded-lg bg-red-50 ring-1 ring-red-200 p-2 text-sm text-red-800">{pwState.error}</p>
+      {needsLogin ? (
+        <section className="rounded-xl bg-white ring-1 ring-stone-200 p-4">
+          <h2 className="font-semibold text-sm">Link a login</h2>
+          <p className="text-xs text-stone-500 mt-1 mb-2">
+            This relative is in the directory but has no account. Adding their mobile number creates a login
+            on this same record. {DEFAULT_PASSWORD_RULE}{' '}
+            {standard ? (
+              <>
+                Leave the password empty to use <span className="font-mono font-semibold text-stone-700">{standard}</span>.
+              </>
+            ) : (
+              <>No birthday is saved, so type a password of at least {MIN_AUTH_PASSWORD_LENGTH} characters.</>
+            )}{' '}
+            Uses the name and birthday already saved — save profile changes first if you just edited them.
+          </p>
+          {linkState?.ok && linkState.password ? (
+            <IssuedPassword
+              password={linkState.password}
+              title={
+                linkState.usedDefault
+                  ? `Login created for ${linkState.fullName ?? member.full_name}. Standard password:`
+                  : `Login created for ${linkState.fullName ?? member.full_name}. Temporary password:`
+              }
+            />
+          ) : (
+            <form action={linkAction} className="space-y-2">
+              <input type="hidden" name="id" value={member.id} />
+              {linkState?.error ? (
+                <p role="alert" className="rounded-lg bg-red-50 ring-1 ring-red-200 p-2 text-sm text-red-800">{linkState.error}</p>
+              ) : null}
+              <label className={labelCls} htmlFor="link_phone">Mobile number (login ID) *</label>
+              <input
+                id="link_phone"
+                name="phone"
+                required
+                inputMode="numeric"
+                pattern="[0-9 +\-]{10,15}"
+                defaultValue={member.phone ?? ''}
+                placeholder="10-digit number"
+                className={inputCls}
+              />
+              <label className={labelCls} htmlFor="link_password">
+                Temporary password {standard ? '(optional)' : '*'}
+              </label>
+              <input
+                id="link_password"
+                name="new_password"
+                type="text"
+                required={!standard}
+                minLength={MIN_AUTH_PASSWORD_LENGTH}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={standard ? `Leave blank to use ${standard}` : `At least ${MIN_AUTH_PASSWORD_LENGTH} characters`}
+                className={inputCls}
+              />
+              <button
+                type="submit"
+                disabled={linkPending}
+                className="w-full rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {linkPending ? 'Creating login…' : 'Create login'}
+              </button>
+            </form>
           )}
-          {pwState?.ok && (
-            <p className="rounded-lg bg-emerald-50 ring-1 ring-emerald-200 p-2 text-sm text-emerald-800">Password reset.</p>
-          )}
-          <input name="new_password" type="text" required minLength={8} placeholder="New temporary password (min 8 chars)" className={inputCls} />
-          <button
-            type="submit"
-            disabled={pwPending}
-            className="w-full rounded-xl ring-1 ring-teal-700 text-teal-800 px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-          >
-            {pwPending ? 'Resetting…' : 'Reset password'}
-          </button>
-        </form>
-      </section>
+        </section>
+      ) : (
+        <section className="rounded-xl bg-white ring-1 ring-stone-200 p-4">
+          <h2 className="font-semibold text-sm">Reset password</h2>
+          <p className="text-xs text-stone-500 mt-1 mb-2">
+            They still sign in with their mobile number. {DEFAULT_PASSWORD_RULE}{' '}
+            {standard ? (
+              <>
+                Leave the box empty to set <span className="font-mono font-semibold text-stone-700">{standard}</span>,
+                or type a different password (at least {MIN_AUTH_PASSWORD_LENGTH} characters).
+              </>
+            ) : (
+              <>No birthday is saved, so a standard password cannot be made. Enter one of at least {MIN_AUTH_PASSWORD_LENGTH} characters.</>
+            )}{' '}
+            This uses the name and birthday already saved — save profile changes first if you just edited them.
+          </p>
+          <form action={pwAction} className="space-y-2">
+            <input type="hidden" name="id" value={member.id} />
+            {pwState?.error ? (
+              <p role="alert" className="rounded-lg bg-red-50 ring-1 ring-red-200 p-2 text-sm text-red-800">{pwState.error}</p>
+            ) : null}
+            {pwState?.ok && pwState.password ? (
+              <IssuedPassword
+                password={pwState.password}
+                title={pwState.usedDefault ? 'Password reset to the standard password.' : 'Password reset to the one you typed.'}
+              />
+            ) : null}
+            <input
+              name="new_password"
+              type="text"
+              required={!standard}
+              minLength={MIN_AUTH_PASSWORD_LENGTH}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={standard ? `Leave blank for ${standard}` : `Temporary password (at least ${MIN_AUTH_PASSWORD_LENGTH} characters)`}
+              className={inputCls}
+            />
+            <button
+              type="submit"
+              disabled={pwPending}
+              className="w-full rounded-xl ring-1 ring-teal-700 text-teal-800 px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+            >
+              {pwPending ? 'Resetting…' : standard ? 'Reset password' : 'Set password'}
+            </button>
+          </form>
+        </section>
+      )}
     </div>
   );
 }
