@@ -21,7 +21,8 @@ export default async function NewMemberPage({
     <div className="px-4 py-6 max-w-lg mx-auto">
       <h1 className="text-xl font-bold mb-1">Add family member</h1>
       <p className="text-sm text-stone-500 mb-4">
-        Creates a login for a relative. They sign in with their mobile number.
+        Creates a login for a relative. They sign in with their mobile number and the
+        standard password (first letter, @, day and month), which is shown here after you create the account.
       </p>
       <NewMemberForm branches={branches} />
     </div>

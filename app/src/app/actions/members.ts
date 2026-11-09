@@ -6,9 +6,18 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone, tenDigits } from '@/lib/phone';
 import { parseNicknames } from '@/lib/nicknames';
+import { resolveAdminPassword } from '@/lib/default-password';
 import type { FamilyRole } from '@/lib/types';
 
-export type MemberFormState = { ok: boolean; error?: string };
+export type MemberFormState = {
+  ok: boolean;
+  error?: string;
+  /** Set when this action created or changed a login, so the admin can pass it on. */
+  password?: string;
+  fullName?: string;
+  /** True when `password` is the standard name + birthday password rather than one the admin typed. */
+  usedDefault?: boolean;
+};
 
 /** Only an admin may manage accounts. Checked against the DB row (source of
  *  truth), not just the JWT claim. Shared with the roster importer. */
@@ -87,14 +96,20 @@ export async function createMember(
   const role = String(formData.get('role') ?? 'member') as FamilyRole;
   const life = readLifeFields(formData);
   if (life.error) return { ok: false, error: life.error };
-  const tempPassword = String(formData.get('temp_password') ?? '');
 
   if (!fullName) return { ok: false, error: 'Full name is required.' };
   if (!tenDigits(rawPhone))
     return { ok: false, error: 'Enter the 10-digit mobile number they will use to sign in.' };
   if (!ASSIGNABLE_ROLES.includes(role)) return { ok: false, error: 'Invalid role.' };
-  if (tempPassword.length < 8)
-    return { ok: false, error: 'Temporary password must be at least 8 characters.' };
+
+  // Blank password → standard name + birthday password. No birthday → the admin must type one.
+  const resolved = resolveAdminPassword({
+    fullName,
+    birthDate: life.birthDate,
+    customPassword: String(formData.get('temp_password') ?? ''),
+  });
+  if ('error' in resolved) return { ok: false, error: resolved.error };
+  const tempPassword = resolved.password;
 
   const admin = createAdminClient();
 
@@ -164,13 +179,14 @@ export async function createMember(
     p_action: 'member.create',
     p_entity: 'profiles',
     p_entity_id: uid,
-    p_detail: { full_name: fullName, role, branch_id: branchId || null },
+    p_detail: { full_name: fullName, role, branch_id: branchId || null, used_default: resolved.usedDefault },
   });
 
   revalidatePath('/directory');
   updateTag('directory');
   revalidatePath('/members');
-  redirect('/members?created=1');
+  // Stay on the form so the admin can copy the password. A redirect would drop it.
+  return { ok: true, password: tempPassword, fullName, usedDefault: resolved.usedDefault };
 }
 
 /** Admin edits an existing member's profile fields (not auth). */
@@ -239,7 +255,9 @@ export async function updateMember(
   redirect(`/members/${id}?saved=1`);
 }
 
-/** Reset a member's password (they keep signing in with their mobile). */
+/** Reset a member's password (they keep signing in with their mobile).
+ *  A blank field sets the standard name + birthday password. A typed value
+ *  is used instead, when it meets the auth minimum length. */
 export async function resetMemberPassword(
   _prev: MemberFormState | null,
   formData: FormData,
@@ -247,13 +265,25 @@ export async function resetMemberPassword(
   const ctx = await requireAdmin();
   if (!ctx) return { ok: false, error: 'Only an admin can reset passwords.' };
   const id = String(formData.get('id') ?? '');
-  const newPassword = String(formData.get('new_password') ?? '');
   if (!id) return { ok: false, error: 'Missing member.' };
-  if (newPassword.length < 8)
-    return { ok: false, error: 'Password must be at least 8 characters.' };
+
+  const { data: member, error: readErr } = await ctx.supabase
+    .from('profiles')
+    .select('full_name, birth_date, birthday_hint')
+    .eq('id', id)
+    .single();
+  if (readErr || !member) return { ok: false, error: 'Member not found.' };
+
+  const resolved = resolveAdminPassword({
+    fullName: member.full_name,
+    birthDate: member.birth_date,
+    birthdayHint: member.birthday_hint,
+    customPassword: String(formData.get('new_password') ?? ''),
+  });
+  if ('error' in resolved) return { ok: false, error: resolved.error };
 
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.updateUserById(id, { password: newPassword });
+  const { error } = await admin.auth.admin.updateUserById(id, { password: resolved.password });
   if (error) return { ok: false, error: error.message };
 
   await admin.rpc('log_audit', {
@@ -261,9 +291,123 @@ export async function resetMemberPassword(
     p_action: 'member.password_reset',
     p_entity: 'auth.users',
     p_entity_id: id,
-    p_detail: {},
+    p_detail: { used_default: resolved.usedDefault },
   });
   revalidatePath(`/members/${id}`);
-  return { ok: true };
+  return {
+    ok: true,
+    password: resolved.password,
+    fullName: member.full_name,
+    usedDefault: resolved.usedDefault,
+  };
+}
+
+/**
+ * Give a directory-only relative (no auth.users row) a login, keeping the
+ * same profile id so history stays attached. Password rules match create/reset:
+ * blank → standard password; no birthday → the admin must type one.
+ */
+export async function linkDirectoryAccount(
+  _prev: MemberFormState | null,
+  formData: FormData,
+): Promise<MemberFormState> {
+  const ctx = await requireAdmin();
+  if (!ctx) return { ok: false, error: 'Only an admin can create logins.' };
+
+  const id = String(formData.get('id') ?? '');
+  const rawPhone = String(formData.get('phone') ?? '').trim();
+  if (!id) return { ok: false, error: 'Missing member.' };
+  if (!tenDigits(rawPhone))
+    return { ok: false, error: 'Enter the 10-digit mobile number they will use to sign in.' };
+
+  const { data: member, error: readErr } = await ctx.supabase
+    .from('profiles')
+    .select('id, full_name, birth_date, birthday_hint')
+    .eq('id', id)
+    .single();
+  if (readErr || !member) return { ok: false, error: 'Member not found.' };
+
+  const resolved = resolveAdminPassword({
+    fullName: member.full_name,
+    birthDate: member.birth_date,
+    birthdayHint: member.birthday_hint,
+    customPassword: String(formData.get('new_password') ?? ''),
+  });
+  if ('error' in resolved) return { ok: false, error: resolved.error };
+
+  const admin = createAdminClient();
+  const { data: existing, error: lookupErr } = await admin.auth.admin.getUserById(id);
+  if (existing?.user) return { ok: false, error: 'This relative already has a login. Use Reset password.' };
+  if (lookupErr) {
+    const status = 'status' in lookupErr ? Number(lookupErr.status) : 0;
+    const missing = status === 404 || /not found/i.test(lookupErr.message);
+    if (!missing) return { ok: false, error: lookupErr.message };
+  }
+
+  const phone = normalizePhone(rawPhone)!;
+  const { data: dup } = await admin
+    .from('profiles')
+    .select('id, full_name')
+    .eq('phone_normalized', phone)
+    .neq('id', id)
+    .maybeSingle();
+  if (dup) return { ok: false, error: `That mobile number is already registered to ${dup.full_name}.` };
+
+  try {
+    const { data, error } = await admin.auth.admin.createUser({
+      id, // same uuid as the directory row; handle_new_user keeps that profile
+      email: `OFH-${phone}@phone.invalid`,
+      password: resolved.password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: member.full_name,
+        phone,
+        created_by: ctx.actorId,
+      },
+    });
+    if (error || !data?.user) {
+      const m = (error?.message ?? '').toLowerCase();
+      return {
+        ok: false,
+        error: m.includes('already')
+          ? 'This relative already has a login. Use Reset password.'
+          : error?.message ?? 'Could not create the login.',
+      };
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Service-role key missing on server.' };
+  }
+
+  const { error: profErr } = await admin.from('profiles').update({ phone }).eq('id', id);
+  if (profErr) {
+    // profiles.id no longer cascades from auth.users (migration 0014), so
+    // removing the half-created login leaves the directory row in place.
+    await admin.auth.admin.deleteUser(id);
+    return {
+      ok: false,
+      error: profErr.code === '23505'
+        ? 'That mobile number is already registered to another relative.'
+        : profErr.message,
+    };
+  }
+
+  await admin.rpc('log_audit', {
+    p_actor: ctx.actorId,
+    p_action: 'member.link_account',
+    p_entity: 'profiles',
+    p_entity_id: id,
+    p_detail: { full_name: member.full_name, used_default: resolved.usedDefault },
+  });
+
+  revalidatePath('/directory');
+  updateTag('directory');
+  revalidatePath('/members');
+  revalidatePath(`/members/${id}`);
+  return {
+    ok: true,
+    password: resolved.password,
+    fullName: member.full_name,
+    usedDefault: resolved.usedDefault,
+  };
 }
 

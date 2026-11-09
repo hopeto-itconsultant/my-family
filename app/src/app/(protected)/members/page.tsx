@@ -55,8 +55,10 @@ export default async function MembersPage() {
       </ul>
 
       <p className="text-xs text-stone-500">
-        New members sign in with their mobile number and the temporary password
-        you set. Ask them to change it from “Me” after first login.
+        New logins use a standard password: the first letter of the name, @, and the
+        day and month of the birthday (Akitoli, 31 July → A@3107). It is shown when
+        you add a member, link a directory-only relative, or reset a password, so you
+        can pass it on. With no birthday saved, you type the password yourself.
       </p>
     </div>
   );

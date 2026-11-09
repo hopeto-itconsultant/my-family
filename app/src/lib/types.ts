@@ -16,6 +16,7 @@ export interface Profile {
   avatar_url: string | null;
   birth_date?: string | null;       // 'YYYY-MM-DD' (migration 0009)
   birth_year?: number | null;       // separate column (migration 0010); kept in sync with birth_date by trigger
+  birthday_hint?: string | null;    // 'YYYY-MM-DD', year always 2000 when the real year is unknown (migration 0014)
   anniversary_date?: string | null; // 'YYYY-MM-DD' (migration 0009)
   nicknames?: string[] | null;      // pet names, normalized text[] (migration 0010)
   date_of_death?: string | null;    // 'YYYY-MM-DD', optional (migration 0010)

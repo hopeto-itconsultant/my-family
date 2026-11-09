@@ -5,7 +5,22 @@ import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireAdminCtx } from './members';
 import { parseRoster, duplicateNames, type ParsedRosterRow } from '@/lib/roster';
+import { defaultMemberPassword } from '@/lib/default-password';
 import type { FamilyRole } from '@/lib/types';
+
+export interface RosterLoginIssued {
+  full_name: string;
+  /** Standard password, or null when no birthday was available (a random password was set). */
+  password: string | null;
+}
+
+export interface RosterImportResult {
+  created: number;
+  skipped: number;
+  errors: string[];
+  /** Logins created in this batch, so the admin can pass on the standard passwords. */
+  logins: RosterLoginIssued[];
+}
 
 export interface RosterPreview {
   rows: ParsedRosterRow[];
@@ -69,24 +84,32 @@ export async function previewRoster(
 
 /**
  * Step 2 — import the confirmed rows.
- *   * Rows with a valid mobile become full login accounts (shadow email,
- *     unassigned temporary password until the admin sets one on /members).
+ *   * Rows with a valid mobile become full login accounts (shadow email).
+ *     The password is the standard name + birthday one. With no birthday,
+ *     the previous behaviour remains: a random password the admin must
+ *     replace on the member page (they have to type one, since no standard
+ *     password can be made).
  *   * Rows without a usable mobile are imported as directory-only profiles
  *     (no login possible) so birthdays/nicknames are still captured.
  *   * Rows whose name already exists are SKIPPED (never duplicated silently).
  * Idempotent-ish: safe to re-run after fixing the sheet.
  */
-export async function importRoster(rows: ParsedRosterRow[], branchId: string | null, role: FamilyRole): Promise<{ created: number; skipped: number; errors: string[] }> {
+export async function importRoster(
+  rows: ParsedRosterRow[],
+  branchId: string | null,
+  role: FamilyRole,
+): Promise<RosterImportResult> {
   const ctx = await requireAdminCtx();
-  if (!ctx) return { created: 0, skipped: 0, errors: ['Only an admin can import members.'] };
+  if (!ctx) return { created: 0, skipped: 0, errors: ['Only an admin can import members.'], logins: [] };
   if (!['member', 'treasurer', 'admin'].includes(role)) {
-    return { created: 0, skipped: 0, errors: ['Invalid default role for import.'] };
+    return { created: 0, skipped: 0, errors: ['Invalid default role for import.'], logins: [] };
   }
-  if (rows.length === 0) return { created: 0, skipped: 0, errors: [] };
+  if (rows.length === 0) return { created: 0, skipped: 0, errors: [], logins: [] };
 
   const admin = createAdminClient();
   const created: string[] = [];
   const errors: string[] = [];
+  const logins: RosterLoginIssued[] = [];
   let skipped = 0;
 
   const { data: existingProfiles } = await admin.from('profiles').select('full_name, phone_normalized');
@@ -106,12 +129,18 @@ export async function importRoster(rows: ParsedRosterRow[], branchId: string | n
 
     if (row.phone) {
       // Full account: profile + auth user via shadow email (same scheme as
-      // migration 0007 / the single-add form). Password stays unset until the
-      // admin assigns one from the member's edit page.
+      // migration 0007 / the single-add form).
+      const standard = defaultMemberPassword(row.full_name, {
+        birthDate: row.birth_date,
+        birthdayHint: row.birthday_hint,
+      });
+      // No day+month on the sheet: keep a random password and tell the admin
+      // they must set one (the reset form will require a typed password).
+      const password = standard ?? `OFH-roster-${crypto.randomUUID()}`;
       try {
         const { data, error } = await admin.auth.admin.createUser({
           email: `OFH-${row.phone}@phone.invalid`,
-          password: `OFH-roster-${crypto.randomUUID()}`, // random; admin resets before sharing
+          password,
           email_confirm: true,
           user_metadata: { full_name: row.full_name, phone: row.phone, branch_id: branchId ?? '' },
         });
@@ -140,6 +169,7 @@ export async function importRoster(rows: ParsedRosterRow[], branchId: string | n
         nameSet.add(key);
         phoneSet.add(row.phone);
         created.push(row.full_name);
+        logins.push({ full_name: row.full_name, password: standard });
       } catch (e) {
         errors.push(`${row.full_name}: ${e instanceof Error ? e.message : 'unexpected error'}`);
       }
@@ -171,7 +201,12 @@ export async function importRoster(rows: ParsedRosterRow[], branchId: string | n
     p_action: 'member.roster_import',
     p_entity: 'profiles',
     p_entity_id: null,
-    p_detail: { created: created.length, skipped, errors: errors.length },
+    p_detail: {
+      created: created.length,
+      skipped,
+      errors: errors.length,
+      standard_passwords: logins.filter((login) => login.password).length,
+    },
   });
 
   revalidatePath('/directory');
@@ -179,7 +214,7 @@ export async function importRoster(rows: ParsedRosterRow[], branchId: string | n
   updateTag('events');
   revalidatePath('/members');
   revalidatePath('/events');
-  return { created: created.length, skipped, errors };
+  return { created: created.length, skipped, errors, logins };
 }
 
 /** Client-facing wrapper so the UI can call it as a form action. */
@@ -203,5 +238,6 @@ export async function importRosterAction(
     skipped: String(result.skipped),
   });
   if (result.errors.length) q.set('errors', result.errors.slice(0, 5).join(' | '));
+  if (result.logins.length) q.set('logins', JSON.stringify(result.logins));
   redirect(`/members/import?${q.toString()}#done`);
 }

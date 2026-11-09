@@ -1,9 +1,14 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { createMember } from '@/app/actions/members';
-import { formatNicknames } from '@/lib/nicknames';
+import { IssuedPassword } from '@/components/issued-password';
+import {
+  DEFAULT_PASSWORD_RULE,
+  MIN_AUTH_PASSWORD_LENGTH,
+  defaultMemberPassword,
+} from '@/lib/default-password';
 import type { Branch, FamilyRole } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
 
@@ -15,17 +20,39 @@ const labelCls = 'block text-xs font-semibold uppercase tracking-wide text-stone
 
 export function NewMemberForm({ branches }: { branches: Branch[] }) {
   const [state, action, pending] = useActionState(createMember, null);
+  const [fullName, setFullName] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const standard = defaultMemberPassword(fullName, { birthDate });
 
   return (
     <form action={action} className="space-y-1">
-      {state?.error && (
+      {state?.error ? (
         <p role="alert" className="rounded-xl bg-red-50 ring-1 ring-red-200 p-3 text-sm text-red-800">
           {state.error}
         </p>
-      )}
+      ) : null}
+      {state?.ok && state.password ? (
+        <IssuedPassword
+          password={state.password}
+          title={
+            state.usedDefault
+              ? `Account created for ${state.fullName ?? 'them'}. Standard password:`
+              : `Account created for ${state.fullName ?? 'them'}. Temporary password:`
+          }
+        />
+      ) : null}
 
       <label className={labelCls} htmlFor="full_name">Full name *</label>
-      <input id="full_name" name="full_name" required autoComplete="name" className={inputCls} placeholder="e.g. Ravi Kumar" />
+      <input
+        id="full_name"
+        name="full_name"
+        required
+        autoComplete="name"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        className={inputCls}
+        placeholder="e.g. Ravi Kumar"
+      />
 
       <label className={labelCls} htmlFor="nicknames">Nicknames / pet names</label>
       <input id="nicknames" name="nicknames" className={inputCls} placeholder="comma-separated, e.g. Appa, Annachi, Kanna" />
@@ -35,8 +62,45 @@ export function NewMemberForm({ branches }: { branches: Branch[] }) {
       <input id="phone" name="phone" required inputMode="numeric" pattern="[0-9 +\-]{10,15}" className={inputCls} placeholder="10-digit number" />
       <p className="text-xs text-stone-500 mt-1">They will sign in with this number and the password below.</p>
 
-      <label className={labelCls} htmlFor="temp_password">Temporary password *</label>
-      <input id="temp_password" name="temp_password" type="text" required minLength={8} className={inputCls} placeholder="Min. 8 characters — share it in person" />
+      <label className={labelCls} htmlFor="birth_date">Full birth date</label>
+      <input
+        id="birth_date"
+        name="birth_date"
+        type="date"
+        value={birthDate}
+        onChange={(e) => setBirthDate(e.target.value)}
+        className={inputCls}
+        max={new Date().toISOString().slice(0, 10)}
+      />
+      <p className="text-xs text-stone-500 mt-1">
+        {standard ? (
+          <>
+            Standard password from this name and date:{' '}
+            <span className="font-mono font-semibold text-stone-800">{standard}</span>. {DEFAULT_PASSWORD_RULE}{' '}
+            Leave the password box empty to use it, or type a different one.
+          </>
+        ) : (
+          <>
+            {DEFAULT_PASSWORD_RULE} Without a full birth date, type a temporary password of at least {MIN_AUTH_PASSWORD_LENGTH} characters.
+            A birth year on its own is not enough.
+          </>
+        )}
+      </p>
+
+      <label className={labelCls} htmlFor="temp_password">
+        Temporary password {standard ? '(optional)' : '*'}
+      </label>
+      <input
+        id="temp_password"
+        name="temp_password"
+        type="text"
+        required={!standard}
+        minLength={MIN_AUTH_PASSWORD_LENGTH}
+        autoComplete="off"
+        spellCheck={false}
+        className={inputCls}
+        placeholder={standard ? `Leave blank to use ${standard}` : `At least ${MIN_AUTH_PASSWORD_LENGTH} characters — share it in person`}
+      />
 
       <label className={labelCls} htmlFor="branch_id">Family branch</label>
       <select id="branch_id" name="branch_id" className={inputCls} defaultValue="">
@@ -54,9 +118,6 @@ export function NewMemberForm({ branches }: { branches: Branch[] }) {
           </option>
         ))}
       </select>
-
-      <label className={labelCls} htmlFor="birth_date">Full birth date (optional)</label>
-      <input id="birth_date" name="birth_date" type="date" className={inputCls} max={new Date().toISOString().slice(0, 10)} />
 
       <label className={labelCls} htmlFor="birth_year">Birth year (optional)</label>
       <input id="birth_year" name="birth_year" inputMode="numeric" pattern="\d{4}" maxLength={4} className={inputCls} placeholder="e.g. 1948 — use when only the year is known" />
