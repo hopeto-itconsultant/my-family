@@ -3,9 +3,11 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { updateMember, resetMemberPassword } from '@/app/actions/members';
+import { memberBirthdayDefaults } from '@/lib/birthday';
 import { formatNicknames } from '@/lib/nicknames';
 import type { Branch, FamilyRole, Profile } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
+import { BirthdayFields } from '../birthday-fields';
 
 const ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
 
@@ -22,6 +24,7 @@ export function EditMemberForm({
 }) {
   const [state, action, pending] = useActionState(updateMember, null);
   const [pwState, pwAction, pwPending] = useActionState(resetMemberPassword, null);
+  const birthday = memberBirthdayDefaults(member);
 
   return (
     <div className="space-y-6">
@@ -69,14 +72,13 @@ export function EditMemberForm({
           ))}
         </select>
 
-        <label className={labelCls} htmlFor="birth_date">Full birth date</label>
-        <input id="birth_date" name="birth_date" type="date" defaultValue={member.birth_date ?? ''} className={inputCls} max={new Date().toISOString().slice(0, 10)} />
-
-        <label className={labelCls} htmlFor="birth_year">Birth year</label>
-        <input id="birth_year" name="birth_year" inputMode="numeric" pattern="\d{4}" maxLength={4}
-          defaultValue={member.birth_year ?? (member.birth_date ? member.birth_date.slice(0, 4) : '')}
-          className={inputCls} placeholder="e.g. 1948 — use when only the year is known" />
-        <p className="text-xs text-stone-500 mt-1">If the full date is given, the year is taken from it automatically.</p>
+        <BirthdayFields
+          month={birthday.month}
+          day={birthday.day}
+          year={birthday.year}
+          inputCls={inputCls}
+          labelCls={labelCls}
+        />
 
         <label className={labelCls} htmlFor="date_of_death">Date of death</label>
         <input id="date_of_death" name="date_of_death" type="date" defaultValue={member.date_of_death ?? ''} className={inputCls} />

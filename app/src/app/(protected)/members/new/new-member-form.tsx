@@ -3,9 +3,9 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { createMember } from '@/app/actions/members';
-import { formatNicknames } from '@/lib/nicknames';
 import type { Branch, FamilyRole } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
+import { BirthdayFields } from '../birthday-fields';
 
 const ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
 
@@ -55,12 +55,7 @@ export function NewMemberForm({ branches }: { branches: Branch[] }) {
         ))}
       </select>
 
-      <label className={labelCls} htmlFor="birth_date">Full birth date (optional)</label>
-      <input id="birth_date" name="birth_date" type="date" className={inputCls} max={new Date().toISOString().slice(0, 10)} />
-
-      <label className={labelCls} htmlFor="birth_year">Birth year (optional)</label>
-      <input id="birth_year" name="birth_year" inputMode="numeric" pattern="\d{4}" maxLength={4} className={inputCls} placeholder="e.g. 1948 — use when only the year is known" />
-      <p className="text-xs text-stone-500 mt-1">If the full date is given, the year is taken from it automatically.</p>
+      <BirthdayFields inputCls={inputCls} labelCls={labelCls} />
 
       <label className={labelCls} htmlFor="date_of_death">Date of death (optional)</label>
       <input id="date_of_death" name="date_of_death" type="date" className={inputCls} />

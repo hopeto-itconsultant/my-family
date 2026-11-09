@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone, tenDigits } from '@/lib/phone';
 import { parseNicknames } from '@/lib/nicknames';
+import { resolveBirthday } from '@/lib/birthday';
 import type { FamilyRole } from '@/lib/types';
 
 export type MemberFormState = { ok: boolean; error?: string };
@@ -29,35 +30,34 @@ export async function requireAdminCtx() {
 
 const requireAdmin = requireAdminCtx;
 
-/** Shared extraction/validation of the new profile fields (migration 0010). */
+/** Shared extraction/validation of birthday (day+month), optional year, and death date. */
 function readLifeFields(formData: FormData): {
   error?: string;
   nicknames: string[] | null;
   birthDate: string | null;
   birthYear: number | null;
+  birthdayHint: string | null;
   dateOfDeath: string | null;
 } {
   const nicknames = parseNicknames(String(formData.get('nicknames') ?? ''));
-  const birthDate = validDate(String(formData.get('birth_date') ?? ''));
   const dateOfDeath = validDate(String(formData.get('date_of_death') ?? ''));
-  const yearRaw = String(formData.get('birth_year') ?? '').trim();
-  let birthYear: number | null = null;
-  if (yearRaw) {
-    if (!/^\d{4}$/.test(yearRaw)) return { error: 'Birth year must be a 4-digit year.', nicknames, birthDate, birthYear, dateOfDeath };
-    birthYear = Number(yearRaw);
-    if (birthYear < 1850 || birthYear > new Date().getFullYear())
-      return { error: 'Birth year must be between 1850 and this year.', nicknames, birthDate, birthYear, dateOfDeath };
+  const birthday = resolveBirthday(
+    String(formData.get('birth_month') ?? ''),
+    String(formData.get('birth_day') ?? ''),
+    String(formData.get('birth_year') ?? ''),
+  );
+  const blank = {
+    nicknames,
+    birthDate: birthday.birthDate,
+    birthYear: birthday.birthYear,
+    birthdayHint: birthday.birthdayHint,
+    dateOfDeath,
+  };
+  if (birthday.error) return { ...blank, error: birthday.error, birthDate: null, birthYear: null, birthdayHint: null };
+  if (dateOfDeath && birthday.birthYear && Number(dateOfDeath.slice(0, 4)) < birthday.birthYear) {
+    return { ...blank, error: 'Date of death cannot be before the birth year.' };
   }
-  // Client-side mirror of the DB trigger's consistency check.
-  if (birthDate && birthYear && birthDate.slice(0, 4) !== String(birthYear))
-    return { error: 'Birth year does not match the full birth date entered.', nicknames, birthDate, birthYear, dateOfDeath };
-  if (birthDate && !birthYear) birthYear = Number(birthDate.slice(0, 4));
-  if (dateOfDeath) {
-    const refYear = birthDate ? Number(birthDate.slice(0, 4)) : birthYear;
-    if (refYear && Number(dateOfDeath.slice(0, 4)) < refYear)
-      return { error: 'Date of death cannot be before the birth year.', nicknames, birthDate, birthYear, dateOfDeath };
-  }
-  return { nicknames: nicknames.length ? nicknames : null, birthDate, birthYear, dateOfDeath };
+  return { ...blank, nicknames: nicknames.length ? nicknames : null };
 }
 
 // Coordinator was merged into Treasurer (migration 0015): one steward role
@@ -143,6 +143,7 @@ export async function createMember(
       role,
       birth_date: life.birthDate,
       birth_year: life.birthYear,
+      birthday_hint: life.birthdayHint,
       anniversary_date: validDate(String(formData.get('anniversary_date') ?? '')),
       nicknames: life.nicknames,
       date_of_death: life.dateOfDeath,
@@ -201,20 +202,51 @@ export async function updateMember(
 
   // Runs under RLS (migration 0009 allows treasurer/admin updates); the DB
   // guard trigger audits the change and blocks invalid role edits.
-  const { error } = await ctx.supabase
-    .from('profiles')
-    .update({
-      full_name: fullName,
-      phone: rawPhone ? normalizePhone(rawPhone) : null,
-      branch_id: branchId || null,
-      role,
-      birth_date: life.birthDate,
-      birth_year: life.birthYear,
-      anniversary_date: validDate(String(formData.get('anniversary_date') ?? '')),
-      nicknames: life.nicknames,
-      date_of_death: life.dateOfDeath,
-    })
-    .eq('id', id);
+  const patch = {
+    full_name: fullName,
+    phone: rawPhone ? normalizePhone(rawPhone) : null,
+    branch_id: branchId || null,
+    role,
+    birth_date: life.birthDate,
+    birth_year: life.birthYear,
+    birthday_hint: life.birthdayHint,
+    anniversary_date: validDate(String(formData.get('anniversary_date') ?? '')),
+    nicknames: life.nicknames,
+    date_of_death: life.dateOfDeath,
+  };
+
+  // normalize_member_dates rejects a new birth_year that disagrees with the
+  // previous full birth_date, even when this update clears that date. Clear
+  // the date first, then store the replacement year.
+  let error: { code?: string; message: string } | null = null;
+  let wrote = false;
+  if (life.birthDate == null && life.birthYear != null) {
+    const { data: current } = await ctx.supabase
+      .from('profiles')
+      .select('birth_date')
+      .eq('id', id)
+      .maybeSingle();
+    const oldYear = current?.birth_date ? Number(String(current.birth_date).slice(0, 4)) : null;
+    if (oldYear != null && oldYear !== life.birthYear) {
+      wrote = true;
+      const cleared = await ctx.supabase
+        .from('profiles')
+        .update({ ...patch, birth_year: null })
+        .eq('id', id);
+      error = cleared.error;
+      if (!error) {
+        const second = await ctx.supabase
+          .from('profiles')
+          .update({ birth_year: life.birthYear })
+          .eq('id', id);
+        error = second.error;
+      }
+    }
+  }
+  if (!wrote) {
+    const result = await ctx.supabase.from('profiles').update(patch).eq('id', id);
+    error = result.error;
+  }
   if (error) {
     return {
       ok: false,
