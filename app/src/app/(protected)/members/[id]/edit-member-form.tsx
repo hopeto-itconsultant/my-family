@@ -64,13 +64,17 @@ export function EditMemberForm({
         </select>
 
         <label className={labelCls} htmlFor="role">Role</label>
-        <select id="role" name="role" className={inputCls} defaultValue={member.role}>
+        <select id="role" name="role" className={inputCls} defaultValue={member.role} aria-describedby="role-help">
           {ROLES.map((r) => (
             <option key={r} value={r}>
-              {ROLE_LABELS[r]}{r === 'treasurer' ? ' (only one allowed)' : ''}
+              {ROLE_LABELS[r]}{r === 'treasurer' ? ' (Mission Fund)' : ''}{r === 'admin' ? ' (full account control)' : ''}
             </option>
           ))}
         </select>
+        <p id="role-help" className="text-xs text-stone-500 mt-1">
+          Treasurer can add, edit, and remove Mission Fund entries. Choose Member to remove that access.
+          Admins can always edit the fund. More than one treasurer is allowed.
+        </p>
 
         <BirthdayFields
           month={birthday.month}
