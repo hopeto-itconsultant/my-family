@@ -1,8 +1,10 @@
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import {
   getCachedDirectory,
   getCachedBranches,
   getCachedEvents,
+  getCachedMemberNames,
   getCachedRelations,
   getCachedUpcomingEvents,
 } from '@/lib/cached';
@@ -19,8 +21,12 @@ export function canManage(rel: Pick<Profile, 'role'>): boolean {
   return rel.role === 'treasurer' || rel.role === 'admin';
 }
 
-/** Server-side session helper used by every protected page. */
-export async function getSession() {
+/**
+ * One auth check and one profile read per request. The layout and the page
+ * both call this; without `cache()` each call was its own `getUser()` round
+ * trip to Supabase.
+ */
+export const getSession = cache(async () => {
   if (!isSupabaseConfigured()) return { profile: null as Profile | null, configured: false };
   const supabase = await createClient();
   const {
@@ -35,7 +41,7 @@ export async function getSession() {
     .single();
 
   return { profile: (data ?? null) as Profile | null, configured: true };
-}
+});
 
 export async function requireProfile(): Promise<Profile> {
   const { profile, configured } = await getSession();
@@ -53,6 +59,11 @@ export async function getDirectory(): Promise<ProfileWithBranch[]> {
 /** All family branches visible to this member (per-request). */
 export async function getBranches(): Promise<Branch[]> {
   return getCachedBranches();
+}
+
+/** id + name only, for labelling events. */
+export async function getMemberNames(): Promise<{ id: string; full_name: string }[]> {
+  return getCachedMemberNames();
 }
 
 /** Relation edges for this member (per-request). */
@@ -82,15 +93,13 @@ export type AppNotification = {
 };
 
 export async function getMyNotifications(limit = 12): Promise<AppNotification[]> {
+  const { profile } = await getSession();
+  if (!profile) return [];
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
   const { data, error } = await supabase
     .from('notifications')
     .select('id, kind, title, body, link, created_at, read_at')
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .is('read_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);

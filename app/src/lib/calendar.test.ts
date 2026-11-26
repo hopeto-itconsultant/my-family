@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 
 import {
   buildCalendarMonth,
+  daysBetween,
   istToday,
   monthKey,
   parseMonthParam,
   shiftMonth,
   shortEventLabel,
+  upcomingEvents,
 } from './calendar';
 import type { FamilyEvent } from './types';
 
@@ -24,6 +26,20 @@ function event(partial: Partial<FamilyEvent> & Pick<FamilyEvent, 'id' | 'kind' |
 function day(calendar: ReturnType<typeof buildCalendarMonth>, iso: string) {
   return calendar.weeks.flat().find((d) => d.iso === iso);
 }
+
+test('the list window uses the stored date, not a projected birthday year', () => {
+  const events = [
+    event({ id: 'old', kind: 'meetup', title: 'Old', occurs_on: '2026-01-01' }),
+    event({ id: 'soon', kind: 'meetup', title: 'Soon', occurs_on: '2026-12-01' }),
+    event({ id: 'far', kind: 'meetup', title: 'Far', occurs_on: '2027-03-01' }),
+    event({ id: 'bday', kind: 'birthday', title: 'Next year', occurs_on: '2027-01-15' }),
+  ];
+  assert.deepEqual(
+    upcomingEvents(events, '2026-11-26', 60).map((item) => item.id),
+    ['soon', 'bday'],
+  );
+  assert.equal(daysBetween('2026-11-26', '2026-12-01'), 5);
+});
 
 test('phone cell labels use a first name, or the title without the kind suffix', () => {
   assert.equal(shortEventLabel({ title: 'Lakshmi — Birthday', who: 'Lakshmi Iyer' }), 'Lakshmi');

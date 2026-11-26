@@ -22,6 +22,14 @@ export const getDirectoryOnce = reactCache(async (): Promise<ProfileWithBranch[]
   return data as unknown as ProfileWithBranch[];
 });
 
+/** Names for the events page. Skips the full profile row the directory needs. */
+export const getMemberNamesOnce = reactCache(async (): Promise<{ id: string; full_name: string }[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('profiles').select('id, full_name').order('full_name');
+  if (error || !data) return [];
+  return data as { id: string; full_name: string }[];
+});
+
 export const getBranchesOnce = reactCache(async (): Promise<Branch[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase

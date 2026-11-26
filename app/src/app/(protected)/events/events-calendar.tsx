@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { formatLongDate, shortEventLabel } from '@/lib/calendar';
 import type { EventKind } from '@/lib/types';
@@ -30,17 +29,17 @@ export function EventsCalendar({
   label,
   todayIso,
   isCurrentMonth,
-  prevHref,
-  nextHref,
-  todayHref,
+  onPrevious,
+  onNext,
+  onToday,
   weeks,
 }: {
   label: string;
   todayIso: string;
   isCurrentMonth: boolean;
-  prevHref: string;
-  nextHref: string;
-  todayHref: string;
+  onPrevious: () => void;
+  onNext: () => void;
+  onToday: () => void;
   weeks: CalendarDayItem[][];
 }) {
   const flat = weeks.flat();
@@ -62,36 +61,34 @@ export function EventsCalendar({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 min-w-0">
-          <Link
-            href={prevHref}
-            scroll={false}
+          <button
+            type="button"
+            onClick={onPrevious}
             aria-label="Previous month"
             className="h-9 w-9 shrink-0 rounded-lg bg-white ring-1 ring-stone-300 font-bold text-stone-700 grid place-items-center active:bg-stone-100"
           >
             ‹
-          </Link>
+          </button>
           <h2 className="text-base font-bold text-stone-900 tabular-nums px-1 truncate">{label}</h2>
-          <Link
-            href={nextHref}
-            scroll={false}
+          <button
+            type="button"
+            onClick={onNext}
             aria-label="Next month"
             className="h-9 w-9 shrink-0 rounded-lg bg-white ring-1 ring-stone-300 font-bold text-stone-700 grid place-items-center active:bg-stone-100"
           >
             ›
-          </Link>
+          </button>
         </div>
-        <Link
-          href={todayHref}
-          scroll={false}
-          onClick={(event) => {
-            if (!isCurrentMonth) return;
-            event.preventDefault();
-            selectDay(todayIso);
+        <button
+          type="button"
+          onClick={() => {
+            if (isCurrentMonth) selectDay(todayIso);
+            else onToday();
           }}
           className="h-9 shrink-0 rounded-lg bg-white ring-1 ring-stone-300 px-3 text-sm font-semibold text-teal-800 grid place-items-center active:bg-stone-100"
         >
           Today
-        </Link>
+        </button>
       </div>
 
       <div className="rounded-2xl overflow-hidden ring-1 ring-stone-200 bg-stone-200">

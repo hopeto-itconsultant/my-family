@@ -3,6 +3,7 @@ import {
   getBranchesOnce,
   getDirectoryOnce,
   getEventsOnce,
+  getMemberNamesOnce,
   getRelationsOnce,
   getUpcomingEventsOnce,
 } from '@/lib/per-request';
@@ -18,6 +19,7 @@ import {
  * for any future tagged cache; nothing here is stored under those tags.
  */
 export const getCachedDirectory = getDirectoryOnce;
+export const getCachedMemberNames = getMemberNamesOnce;
 export const getCachedBranches = getBranchesOnce;
 export const getCachedRelations = getRelationsOnce;
 export const getCachedUpcomingEvents = getUpcomingEventsOnce;
