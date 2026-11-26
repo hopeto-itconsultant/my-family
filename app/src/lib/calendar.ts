@@ -89,6 +89,25 @@ export function shortEventLabel(event: { title: string; who?: string | null }): 
   return stripped || event.title.trim();
 }
 
+/** Stored-date window used by the events list. `todayIso` is inclusive. */
+export function upcomingEvents<T extends { occurs_on: string }>(events: T[], todayIso: string, days = 60): T[] {
+  const until = addIsoDays(todayIso, days);
+  if (!until) return [];
+  return events.filter((event) => {
+    const iso = event.occurs_on.slice(0, 10);
+    return iso >= todayIso && iso <= until;
+  });
+}
+
+export function daysBetween(fromIso: string, toIso: string): number | null {
+  const from = parseIsoDate(fromIso);
+  const to = parseIsoDate(toIso);
+  if (!from || !to) return null;
+  const utc = (part: { year: number; month: number; day: number }) =>
+    Date.UTC(part.year, part.month - 1, part.day);
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}
+
 export function formatLongDate(iso: string): string {
   const parsed = parseIsoDate(iso);
   if (!parsed) return iso;
@@ -221,6 +240,10 @@ function isoFromParts(year: number, month: number, day: number): string {
 
 function monthDayKey(month: number, day: number): string {
   return `${pad2(month)}-${pad2(day)}`;
+}
+
+function addIsoDays(iso: string, days: number): string | null {
+  return addDays(iso, days);
 }
 
 function addDays(iso: string, days: number): string {
