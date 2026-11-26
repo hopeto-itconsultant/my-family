@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireProfile } from '@/lib/session';
+import { getActivePreview } from '@/lib/view-as-session';
 import { updateOwnProfile, signOut } from '@/app/actions/auth';
 import { ROLE_LABELS } from '@/lib/types';
 
@@ -9,6 +10,7 @@ export default async function MePage({
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
   const profile = await requireProfile();
+  const preview = await getActivePreview();
   const sp = await searchParams;
 
   return (
@@ -43,6 +45,7 @@ export default async function MePage({
         action={updateOwnProfile}
         className="rounded-2xl bg-white ring-1 ring-stone-200 p-4 space-y-4"
       >
+        <fieldset disabled={preview !== null} className="space-y-4 disabled:opacity-60">
         <div>
           <label className="block text-sm font-medium mb-1" htmlFor="full_name">
             Full name
@@ -73,9 +76,13 @@ export default async function MePage({
             Must be unique in the family. Changing it changes your sign-in number.
           </p>
         </div>
-        <button className="w-full rounded-xl bg-teal-700 py-3 font-semibold text-white active:scale-[0.99] transition">
+        <button className="w-full rounded-xl bg-teal-700 py-3 font-semibold text-white active:scale-[0.99] transition disabled:bg-stone-300">
           Save changes
         </button>
+        </fieldset>
+        {preview && (
+          <p className="text-xs text-amber-900">Read-only preview. Exit to change this profile.</p>
+        )}
       </form>
 
       <div className="space-y-2">
@@ -85,11 +92,17 @@ export default async function MePage({
         >
           💛 Mission Fund dashboard
         </Link>
+        {preview ? (
+          <p className="rounded-xl bg-stone-100 ring-1 ring-stone-200 px-4 py-3 text-sm text-stone-600">
+            Sign out is turned off during this preview. Use Exit to return to your account.
+          </p>
+        ) : (
         <form action={signOut}>
           <button className="w-full rounded-xl bg-stone-100 ring-1 ring-stone-200 py-3 font-medium text-stone-700">
             Sign out
           </button>
         </form>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { NavigationShell } from './navigation-shell';
+import { ViewAsBanner } from '@/components/view-as-banner';
+import { ViewAsProvider } from '@/components/view-as-context';
 import { requireProfile, getMyNotifications } from '@/lib/session';
+import { getActivePreview, readPreviewSeal, unusableSealReason } from '@/lib/view-as-session';
 import { ROLE_LABELS } from '@/lib/types';
 
 const TABS = [
@@ -19,12 +22,20 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const seal = await readPreviewSeal();
+  const preview = await getActivePreview();
+  if (seal && !preview) {
+    redirect(`/view-as/exit?reason=${unusableSealReason(seal)}`);
+  }
   const profile = await requireProfile();
   const unread = await getMyNotifications(5);
 
   return (
+    <ViewAsProvider active={preview !== null}>
     <div className="min-h-dvh flex flex-col">
-      <header className="sticky top-0 z-20 bg-teal-800 text-white px-4 py-3 flex items-center justify-between shadow">
+      <div className="sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
+      {preview && <ViewAsBanner name={profile.full_name} />}
+      <header className="bg-teal-800 text-white px-4 py-3 flex items-center justify-between shadow">
         <Link href="/" className="font-bold tracking-tight flex items-center gap-2">
           <span aria-hidden>🏡</span> Our Family Home
         </Link>
@@ -43,8 +54,10 @@ export default async function ProtectedLayout({
           </span>
         </div>
       </header>
+      </div>
 
       <NavigationShell tabs={TABS}>{children}</NavigationShell>
     </div>
+    </ViewAsProvider>
   );
 }

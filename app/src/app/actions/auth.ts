@@ -2,8 +2,9 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { createActorClient, createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import { normalizePhone, tenDigits } from '@/lib/phone';
 import {
   attemptPhonePasswordSignIn,
@@ -24,6 +25,8 @@ import {
  * real emails and that anon could not execute.
  */
 export async function signInWithPhone(formData: FormData) {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) redirect(`/login?error=${encodeURIComponent(readOnly)}`);
   const raw = String(formData.get('phone') ?? '').trim();
   const password = String(formData.get('password') ?? '');
   const next = String(formData.get('next') || '/');
@@ -33,7 +36,7 @@ export async function signInWithPhone(formData: FormData) {
   }
   const normalized = normalizePhone(raw)!;
 
-  const supabase = await createClient();
+  const supabase = await createActorClient();
   // redirect() throws, so it stays outside this try (Next.js server functions).
   let lookup;
   let lookupUnavailable = false;
@@ -64,7 +67,9 @@ export async function signInWithPhone(formData: FormData) {
 
 /** Legacy path: members invited by email can still sign in with their email. */
 export async function signInWithEmail(formData: FormData) {
-  const supabase = await createClient();
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) redirect(`/login?error=${encodeURIComponent(readOnly)}`);
+  const supabase = await createActorClient();
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const password = String(formData.get('password') ?? '');
 
@@ -76,7 +81,9 @@ export async function signInWithEmail(formData: FormData) {
 }
 
 export async function signOut() {
-  const supabase = await createClient();
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) redirect(`/home?error=${encodeURIComponent(readOnly)}`);
+  const supabase = await createActorClient();
   await supabase.auth.signOut();
   redirect('/login');
 }
@@ -84,6 +91,8 @@ export async function signOut() {
 /** Members may edit their own display name / phone. Role & branch are admin-only
  *  (enforced again by RLS + DB triggers — including phone uniqueness + audit). */
 export async function updateOwnProfile(formData: FormData) {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) redirect(`/home?error=${encodeURIComponent(readOnly)}`);
   const supabase = await createClient();
   const {
     data: { user },

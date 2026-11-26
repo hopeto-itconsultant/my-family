@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/session';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import { parseRupeesToPaise } from '@/lib/money';
 import type { FamilyAsset, HistoryEntry, PhotoMeta } from '@/lib/types';
 
@@ -30,6 +31,8 @@ export async function addHistoryEntry(input: {
   story: string;
   eventDate: string; // '' allowed → undated
 }): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   if (input.title.trim().length < 2) return { ok: false, error: 'Give the story a title.' };
   if (input.story.trim().length < 2) return { ok: false, error: 'Write the story itself :)' };
@@ -81,6 +84,8 @@ export async function getPhotosWithUrls(limit = 48): Promise<PhotoWithUrl[]> {
 }
 
 export async function uploadPhoto(form: FormData): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   const file = form.get('file');
   const caption = String(form.get('caption') ?? '').trim();
@@ -138,6 +143,8 @@ export async function addAsset(input: {
   amountRupees: string; // converted to integer paise
   notes: string;
 }): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   if (!input.name.trim()) return { ok: false, error: 'Name the asset.' };
   if (input.ownerType !== 'family' && !input.ownerId)

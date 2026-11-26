@@ -3,6 +3,7 @@
 import { revalidatePath, updateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, canManage } from '@/lib/session';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import type { EventKind } from '@/lib/types';
 import type { ActionResult } from './tree';
 
@@ -21,6 +22,8 @@ export async function createEvent(input: {
   venue?: string | null;
   notes?: string | null;
 }): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   if (!canManage(profile) && !(input.kind === 'birthday' && input.member_id === profile.id)) {
     return { ok: false, error: 'You can only add your own birthday. Ask the treasurer to add anniversaries or meetups.' };
@@ -54,6 +57,8 @@ export async function createEvent(input: {
 }
 
 export async function deleteEvent(id: string): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   const supabase = await createClient();
 

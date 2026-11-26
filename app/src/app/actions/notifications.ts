@@ -2,10 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 
 /** Mark one of MY notifications read. RLS restricts updates to own rows and
  *  the policy only allows setting read_at — titles/links cannot be tampered with. */
 export async function markNotificationRead(id: string): Promise<void> {
+  if (await blockViewAsWrite()) return;
   const supabase = await createClient();
   const {
     data: { user },

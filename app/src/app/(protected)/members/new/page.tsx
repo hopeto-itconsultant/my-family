@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireProfile } from '@/lib/session';
+import { getActivePreview } from '@/lib/view-as-session';
 import { getBranches } from '@/lib/session';
 import { NewMemberForm } from './new-member-form';
 
@@ -11,6 +12,7 @@ export default async function NewMemberPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const profile = await requireProfile();
+  if (await getActivePreview()) redirect('/members');
   if (profile.role !== 'admin') {
     redirect('/members?error=' + encodeURIComponent('Only an admin can add members.'));
   }

@@ -2,7 +2,8 @@
 
 import { revalidatePath, updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createActorClient } from '@/lib/supabase/server';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone, tenDigits } from '@/lib/phone';
 import { parseNicknames } from '@/lib/nicknames';
@@ -11,24 +12,29 @@ import type { FamilyRole } from '@/lib/types';
 
 export type MemberFormState = { ok: boolean; error?: string };
 
+export type AdminCtx =
+  | { ok: true; supabase: Awaited<ReturnType<typeof createActorClient>>; actorId: string }
+  | { ok: false; error: string };
+
 /** Only an admin may manage accounts. Checked against the DB row (source of
- *  truth), not just the JWT claim. Shared with the roster importer. */
-export async function requireAdminCtx() {
-  const supabase = await createClient();
+ *  truth), not just the JWT claim, and always against the real signed-in
+ *  person — never the view-as preview. Shared with the roster importer. */
+export async function requireAdminCtx(denied: string): Promise<AdminCtx> {
+  const blocked = await blockViewAsWrite();
+  if (blocked) return { ok: false, error: blocked };
+  const supabase = await createActorClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return { ok: false, error: denied };
   const { data: me } = await supabase
     .from('profiles')
-    .select('role, full_name')
+    .select('role')
     .eq('id', user.id)
     .single();
-  if (!me || me.role !== 'admin') return null;
-  return { supabase, actorId: user.id };
+  if (!me || me.role !== 'admin') return { ok: false, error: denied };
+  return { ok: true, supabase, actorId: user.id };
 }
-
-const requireAdmin = requireAdminCtx;
 
 /** Shared extraction/validation of birthday (day+month), optional year, and death date. */
 function readLifeFields(formData: FormData): {
@@ -79,8 +85,8 @@ export async function createMember(
   _prev: MemberFormState | null,
   formData: FormData,
 ): Promise<MemberFormState> {
-  const ctx = await requireAdmin();
-  if (!ctx) return { ok: false, error: 'Only an admin can add members. Sign in as admin.' };
+  const ctx = await requireAdminCtx('Only an admin can add members. Sign in as admin.');
+  if (!ctx.ok) return { ok: false, error: ctx.error };
 
   const fullName = String(formData.get('full_name') ?? '').trim();
   const rawPhone = String(formData.get('phone') ?? '').trim();
@@ -180,8 +186,8 @@ export async function updateMember(
   _prev: MemberFormState | null,
   formData: FormData,
 ): Promise<MemberFormState> {
-  const ctx = await requireAdmin();
-  if (!ctx) return { ok: false, error: 'Only an admin can edit members.' };
+  const ctx = await requireAdminCtx('Only an admin can edit members.');
+  if (!ctx.ok) return { ok: false, error: ctx.error };
 
   const id = String(formData.get('id') ?? '');
   const fullName = String(formData.get('full_name') ?? '').trim();
@@ -277,8 +283,8 @@ export async function resetMemberPassword(
   _prev: MemberFormState | null,
   formData: FormData,
 ): Promise<MemberFormState> {
-  const ctx = await requireAdmin();
-  if (!ctx) return { ok: false, error: 'Only an admin can reset passwords.' };
+  const ctx = await requireAdminCtx('Only an admin can reset passwords.');
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const id = String(formData.get('id') ?? '');
   const newPassword = String(formData.get('new_password') ?? '');
   if (!id) return { ok: false, error: 'Missing member.' };

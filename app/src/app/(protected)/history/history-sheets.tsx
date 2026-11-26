@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useViewAsReadOnly } from '@/components/view-as-context';
 import { useOnline } from '@/components/pwa';
 import { addHistoryEntry, uploadPhoto, addAsset, type ActionResult } from '@/app/actions/history';
 
@@ -15,6 +16,7 @@ export function HistorySheets({
   people: { id: string; name: string }[];
   branches: { id: string; name: string }[];
 }) {
+  const readOnly = useViewAsReadOnly();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('story');
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -72,6 +74,8 @@ export function HistorySheets({
       if (res.ok) setTimeout(() => setOpen(false), 900);
     });
   }
+
+  if (readOnly) return null;
 
   return (
     <>

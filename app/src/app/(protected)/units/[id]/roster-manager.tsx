@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useViewAsReadOnly } from '@/components/view-as-context';
 import {
   grantMembership,
   updateMembership,
@@ -36,11 +37,13 @@ export function RosterManager({
   myLevel: number;
   myId: string;
 }) {
+  const readOnly = useViewAsReadOnly();
+  const level = readOnly ? 0 : myLevel;
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [picked, setPicked] = useState('');
   const [role, setRole] = useState<MembershipRole>('viewer');
-  const removable = myLevel >= 6; // coordinator+ in this unit (or global admin mapped to 7)
+  const removable = level >= 6; // coordinator+ in this unit (or global admin mapped to 7)
 
   async function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
@@ -57,7 +60,7 @@ export function RosterManager({
       )}
 
       {/* add a member */}
-      {myLevel > 0 && (
+      {level > 0 && (
         <div className="rounded-xl bg-white ring-1 ring-stone-200 p-3 space-y-2">
           <p className="text-sm font-semibold">Add member</p>
           <div className="flex gap-2 flex-wrap">
@@ -78,7 +81,7 @@ export function RosterManager({
               className="rounded-xl border border-stone-300 px-2 py-2 text-sm"
               aria-label="Role"
             >
-              {grantableRoles(myLevel).map((r) => (
+              {grantableRoles(level).map((r) => (
                 <option key={r} value={r}>{MEMBERSHIP_ROLE_LABELS[r]}</option>
               ))}
             </select>
@@ -91,7 +94,7 @@ export function RosterManager({
             </button>
           </div>
           <p className="text-[11px] text-stone-500">
-            You can grant roles up to your own level ({myLevel}/7). The database enforces this again.
+            You can grant roles up to your own level ({level}/7). The database enforces this again.
           </p>
         </div>
       )}
@@ -119,7 +122,7 @@ export function RosterManager({
               </span>
             </div>
 
-            {myLevel > 0 && r.member_id !== myId ? (
+            {level > 0 && r.member_id !== myId ? (
               <div className="mt-2 flex gap-2 flex-wrap items-center">
                 <select
                   defaultValue={r.member_role}
@@ -136,10 +139,10 @@ export function RosterManager({
                   className="rounded-lg border border-stone-300 px-2 py-1 text-xs"
                   aria-label={`Role for ${r.full_name}`}
                 >
-                  {grantableRoles(myLevel).map((x) => (
+                  {grantableRoles(level).map((x) => (
                     <option key={x} value={x}>{MEMBERSHIP_ROLE_LABELS[x]}</option>
                   ))}
-                  {!grantableRoles(myLevel).includes(r.member_role) && (
+                  {!grantableRoles(level).includes(r.member_role) && (
                     <option value={r.member_role}>{MEMBERSHIP_ROLE_LABELS[r.member_role]} (current)</option>
                   )}
                 </select>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useViewAsReadOnly } from '@/components/view-as-context';
 import { useOnline } from '@/components/pwa';
 import { addAchievement, type ActionResult } from '@/app/actions/prayers';
 
@@ -21,6 +22,7 @@ const KINDS = [
 
 /** Bottom-sheet: celebrate a relative's achievement. */
 export function AchievementSheet({ people, selfId }: { people: PersonOption[]; selfId: string }) {
+  const readOnly = useViewAsReadOnly();
   const [open, setOpen] = useState(false);
   const [memberId, setMemberId] = useState(selfId);
   const [kind, setKind] = useState('education');
@@ -50,6 +52,8 @@ export function AchievementSheet({ people, selfId }: { people: PersonOption[]; s
       }
     });
   }
+
+  if (readOnly) return null;
 
   return (
     <>

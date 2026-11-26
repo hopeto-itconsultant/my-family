@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, canManage } from '@/lib/session';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import type { Achievement, PrayerRequest } from '@/lib/types';
 
 export interface ActionResult {
@@ -35,6 +36,8 @@ export async function submitPrayer(input: {
   detail: string;
   isPrivate: boolean;
 }): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   const title = input.title.trim();
   if (title.length < 2 || title.length > 160)
@@ -55,6 +58,8 @@ export async function submitPrayer(input: {
 
 /** Owner marks their own request answered (with a short testimony note). */
 export async function markPrayerAnswered(id: string, note: string): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   const supabase = await createClient();
   const { error } = await supabase
@@ -72,6 +77,8 @@ export async function leaderUpdatePrayer(
   id: string,
   patch: Partial<Pick<PrayerRequest, 'status' | 'answered_note'>>,
 ): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   if (!canManage(profile)) return { ok: false, error: 'Leaders only.' };
   const supabase = await createClient();
@@ -105,6 +112,8 @@ export async function addAchievement(input: {
   detail: string;
   achievedOn: string; // YYYY-MM-DD
 }): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   const title = input.title.trim();
   if (title.length < 2) return { ok: false, error: 'Give the achievement a short title.' };
