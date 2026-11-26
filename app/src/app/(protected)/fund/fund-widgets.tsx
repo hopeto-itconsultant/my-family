@@ -272,7 +272,7 @@ export function ExpenseControls({ e, names, receiptUrl }: { e: Expense; names: R
               <input value={field} onChange={(ev) => setField(ev.target.value)} className={inputCls} placeholder="Outbound UPI/bank ref, or “CASH”" maxLength={80} />
               <input type="file" accept="image/*,application/pdf" className={inputCls}
                 onChange={(ev) => setFile(ev.target.files?.[0] ?? null)} />
-              <p className="text-xs text-stone-500">Receipt is stored in private storage; only the treasurer can upload/manage it.</p>
+              <p className="text-xs text-stone-500">Receipt is stored in private storage; only a treasurer or an admin can upload it.</p>
             </>
           )}
           <ErrorNote result={result} />
