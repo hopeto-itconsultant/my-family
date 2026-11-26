@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { requireProfile } from '@/lib/session';
+import { getActivePreview } from '@/lib/view-as-session';
 import { NewUnitForm } from './new-unit-form';
 
 export const metadata = { title: 'New group · Our Family Home' };
 
 export default async function NewUnitPage() {
   const profile = await requireProfile();
+  if (await getActivePreview()) redirect('/units');
   if (profile.role !== 'admin' && profile.role !== 'treasurer') {
     redirect('/units?error=' + encodeURIComponent('Only a treasurer or admin can create groups.'));
   }

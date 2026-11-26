@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useViewAsReadOnly } from '@/components/view-as-context';
 import { useOnline } from '@/components/pwa';
 import { createEvent, type ActionResult } from '@/app/actions/events';
 import type { EventKind } from '@/lib/types';
@@ -22,6 +23,7 @@ const KINDS: { value: EventKind; label: string; icon: string }[] = [
 
 /** Bottom-sheet form to propose/add an event (RLS decides what is allowed). */
 export function AddEventSheet({ people, branches }: { people: PersonOption[]; branches: BranchOption[] }) {
+  const readOnly = useViewAsReadOnly();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<EventKind>('meetup');
   const [title, setTitle] = useState('');
@@ -68,6 +70,8 @@ export function AddEventSheet({ people, branches }: { people: PersonOption[]; br
   const fieldCls =
     'mt-1 w-full rounded-xl border-0 bg-stone-100 px-3 py-2.5 text-sm ring-1 ring-inset ring-stone-300 focus:ring-2 focus:ring-teal-600';
   const labelCls = 'block text-xs font-semibold uppercase tracking-wide text-stone-500';
+
+  if (readOnly) return null;
 
   return (
     <>

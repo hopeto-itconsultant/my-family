@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireProfile } from '@/lib/session';
+import { getActivePreview } from '@/lib/view-as-session';
 import { createClient } from '@/lib/supabase/server';
 import { sortUnits } from '@/lib/access';
 import type { UnitScope, UnitKind } from '@/lib/access';
@@ -20,6 +21,7 @@ interface UnitRow {
  *  RLS on unit_memberships guarantees only real memberships appear here. */
 export default async function UnitsPage() {
   const profile = await requireProfile();
+  const preview = await getActivePreview();
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -27,7 +29,7 @@ export default async function UnitsPage() {
     .select('id, kind, name, description, scope, status, member_role');
   const units = sortUnits((data ?? []) as UnitRow[]);
 
-  const canCreate = profile.role === 'admin' || profile.role === 'treasurer';
+  const canCreate = (profile.role === 'admin' || profile.role === 'treasurer') && !preview;
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto space-y-4">

@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useViewAsReadOnly } from '@/components/view-as-context';
 import { useOnline } from '@/components/pwa';
 import { submitPrayer, markPrayerAnswered, type ActionResult } from '@/app/actions/prayers';
 
 /** Bottom-sheet: post a prayer request (public to family, or private). */
 export function PrayerSheet() {
+  const readOnly = useViewAsReadOnly();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
@@ -13,6 +15,7 @@ export function PrayerSheet() {
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const online = useOnline();
+  if (readOnly) return null;
 
   const canSubmit = title.trim().length >= 2 && !isPending;
 
@@ -93,10 +96,12 @@ export function PrayerSheet() {
 
 /** Inline "God answered!" flow for the author's own active prayers. */
 export function AnswerPrayerButton({ id }: { id: string }) {
+  const readOnly = useViewAsReadOnly();
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState('');
   const [isPending, startTransition] = useTransition();
   const online = useOnline();
+  if (readOnly) return null;
 
   if (!editing) {
     return (

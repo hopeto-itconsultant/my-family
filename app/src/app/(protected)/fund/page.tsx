@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireProfile, getDirectory } from '@/lib/session';
+import { getActivePreview } from '@/lib/view-as-session';
 import { canWriteFund } from '@/lib/fund-access';
 import { formatPaise } from '@/lib/money';
 import {
@@ -54,7 +55,9 @@ function auditLabel(a: AuditRow): string {
 
 export default async function FundPage() {
   const profile = await requireProfile();
+  const preview = await getActivePreview();
   const canWrite = canWriteFund(profile.role);
+  const canMutate = canWrite && !preview;
 
   const monthRef = new Date().toISOString().slice(0, 7);
   const [directory, summary, contributions, expenses, branchRows, audit] = await Promise.all([
@@ -103,10 +106,14 @@ export default async function FundPage() {
       </section>
 
       {/* Primary actions — treasurer and admin record entries; everyone else views */}
-      {canWrite ? (
+      {canMutate ? (
         <div className="space-y-3">
           <RecordPaymentSheet directory={directory} />
         </div>
+      ) : canWrite ? (
+        <p className="text-xs rounded-xl bg-amber-50 text-amber-950 ring-1 ring-amber-200 px-4 py-3">
+          Read-only preview. This member can change fund entries; those controls are turned off.
+        </p>
       ) : (
         <p className="text-xs rounded-xl bg-stone-100 text-stone-600 px-4 py-3">
           View only. Treasurers and admins record, edit, and remove fund entries.
@@ -133,7 +140,7 @@ export default async function FundPage() {
       )}
 
       {/* Treasurer queues */}
-      {canWrite && (queue.length > 0 || openExpenses.length > 0) && (
+      {canMutate && (queue.length > 0 || openExpenses.length > 0) && (
         <section className="space-y-3">
           <h2 className="font-semibold">🧑‍💼 Treasurer queue</h2>
           {queue.length > 0 && (
@@ -191,7 +198,7 @@ export default async function FundPage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Family ledger</h2>
-          {canWrite && <ExpenseRequestSheet />}
+          {canMutate && <ExpenseRequestSheet />}
         </div>
         {ledger.length === 0 && (
           <p className="text-sm text-stone-500 rounded-xl bg-white ring-1 ring-stone-200 p-4">
@@ -223,7 +230,7 @@ export default async function FundPage() {
               <p className="text-xs text-stone-500">
                 requested by {names[e.requested_by] ?? 'member'}{e.bank_ref ? ` · ref ${e.bank_ref}` : ''}{e.reject_reason ? ` · ${e.reject_reason}` : ''}
               </p>
-              {canWrite && <ExpenseControls e={e} names={names} receiptUrl={receiptUrls[e.id] ?? null} />}
+              {canMutate && <ExpenseControls e={e} names={names} receiptUrl={receiptUrls[e.id] ?? null} />}
             </div>
           ))}
         </section>

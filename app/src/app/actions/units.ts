@@ -2,24 +2,38 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import type { MembershipRole, MembershipStatus } from '@/lib/access';
 import { MEMBERSHIP_ROLE_LEVEL } from '@/lib/access';
 
 export type UnitActionState = { ok: boolean; error?: string };
 
+type Me =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      supabase: Awaited<ReturnType<typeof createClient>>;
+      id: string;
+      role: string;
+      full_name: string;
+    };
+
 /** Resolve the caller's DB-truth profile (never trust the browser). */
-async function me() {
+async function me(): Promise<Me> {
+  const blocked = await blockViewAsWrite();
+  if (blocked) return { ok: false, error: blocked };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return { ok: false, error: 'Please sign in again.' };
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, role, full_name')
     .eq('id', user.id)
     .single();
-  return profile ? { supabase, ...profile } : null;
+  if (!profile) return { ok: false, error: 'Please sign in again.' };
+  return { ok: true, supabase, id: profile.id, role: profile.role, full_name: profile.full_name };
 }
 
 /** Server-side mirror of can_grant_role_in_unit(): returns MY active level in
@@ -46,7 +60,7 @@ async function myUnitLevel(
 
 export async function createUnit(_prev: UnitActionState, formData: FormData): Promise<UnitActionState> {
   const ctx = await me();
-  if (!ctx) return { ok: false, error: 'Please sign in again.' };
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const name = String(formData.get('name') ?? '').trim();
   const kind = String(formData.get('kind') ?? 'group');
   const description = String(formData.get('description') ?? '').trim() || null;
@@ -74,7 +88,7 @@ export async function createUnit(_prev: UnitActionState, formData: FormData): Pr
 
 export async function setUnitStatus(unitId: string, status: 'active' | 'archived'): Promise<UnitActionState> {
   const ctx = await me();
-  if (!ctx) return { ok: false, error: 'Please sign in again.' };
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   if (ctx.role !== 'admin' && ctx.role !== 'treasurer')
     return { ok: false, error: 'Only a treasurer or admin can archive or restore units.' };
   const { error } = await ctx.supabase.from('org_units').update({ status }).eq('id', unitId);
@@ -91,7 +105,7 @@ export async function grantMembership(input: {
   role: MembershipRole;
 }): Promise<UnitActionState> {
   const ctx = await me();
-  if (!ctx) return { ok: false, error: 'Please sign in again.' };
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const level = await myUnitLevel(ctx.supabase, ctx.id, ctx.role, input.unitId);
   const want = MEMBERSHIP_ROLE_LEVEL[input.role] ?? 0;
   if (level < want)
@@ -121,7 +135,7 @@ export async function updateMembership(input: {
   status?: MembershipStatus;
 }): Promise<UnitActionState> {
   const ctx = await me();
-  if (!ctx) return { ok: false, error: 'Please sign in again.' };
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const level = await myUnitLevel(ctx.supabase, ctx.id, ctx.role, input.unitId);
   if (level === 0) return { ok: false, error: 'You are not an active member of this unit.' };
 
@@ -145,7 +159,7 @@ export async function removeMembership(input: {
   membershipId: string;
 }): Promise<UnitActionState> {
   const ctx = await me();
-  if (!ctx) return { ok: false, error: 'Please sign in again.' };
+  if (!ctx.ok) return { ok: false, error: ctx.error };
   const level = await myUnitLevel(ctx.supabase, ctx.id, ctx.role, input.unitId);
   if (level === 0) return { ok: false, error: 'You are not an active member of this unit.' };
   const { error } = await ctx.supabase.from('unit_memberships').delete().eq('id', input.membershipId);

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireProfile, getDirectory, getRelations, canManage } from '@/lib/session';
+import { getActivePreview } from '@/lib/view-as-session';
 import { buildTree } from '@/lib/tree';
 import type { ProfileWithBranch } from '@/lib/types';
 import { AddRelationSheet } from './add-relation';
@@ -8,6 +9,7 @@ export const metadata = { title: 'Family tree · Our Family Home' };
 
 export default async function TreePage() {
   const profile = await requireProfile();
+  const preview = await getActivePreview();
   const [people, relations] = await Promise.all([getDirectory(), getRelations()]);
 
   const names = new Map(people.map((p) => [p.id, p.full_name]));
@@ -27,7 +29,7 @@ export default async function TreePage() {
               : `${tree.generations.length} generation${tree.generations.length > 1 ? 's' : ''} · ${connectedCount} linked`}
           </p>
         </div>
-        {canManage(profile) && <AddRelationSheet people={people.map((p) => ({ id: p.id, name: p.full_name }))} />}
+        {canManage(profile) && !preview && <AddRelationSheet people={people.map((p) => ({ id: p.id, name: p.full_name }))} />}
       </div>
 
       {tree.hasCycle && (

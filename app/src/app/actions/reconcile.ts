@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/session';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import type { StatementBatch, StatementRowView, ReconcileReport, LedgerCandidate } from '@/lib/types';
 import type { StatementRow } from '@/lib/csv';
 import type { ActionResult } from './fund';
@@ -18,6 +19,8 @@ export async function importStatementBatch(
   label: string,
   rows: StatementRow[],
 ): Promise<ActionResult & { batchId?: string }> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   if (profile.role !== 'treasurer' && profile.role !== 'admin') {
     return { ok: false, error: 'Only the treasurer can import bank statements.' };
@@ -139,6 +142,8 @@ export async function matchStatementRow(
   kind: 'contribution' | 'expense',
   targetId: string,
 ): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const supabase = await createClient();
   const { error } = await supabase.rpc('match_statement_row', {
     p_row_id: rowId,
@@ -151,6 +156,8 @@ export async function matchStatementRow(
 }
 
 export async function unmatchStatementRow(rowId: string): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const supabase = await createClient();
   const { error } = await supabase.rpc('unmatch_statement_row', { p_row_id: rowId });
   if (error) return { ok: false, error: error.message.replace(/^.*?: /, '') };

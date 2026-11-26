@@ -3,6 +3,7 @@
 import { revalidatePath, updateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile, canManage } from '@/lib/session';
+import { blockViewAsWrite } from '@/lib/view-as-session';
 import type { RelationKind } from '@/lib/types';
 
 export interface ActionResult {
@@ -22,6 +23,8 @@ export async function addRelation(input: {
   /** for 'parent': which of a/b is the child */
   childIsA?: boolean;
 }): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   if (!canManage(profile)) return { ok: false, error: 'Only the treasurer and admins can edit the family tree.' };
 
@@ -55,6 +58,8 @@ export async function addRelation(input: {
 }
 
 export async function deleteRelation(id: string): Promise<ActionResult> {
+  const readOnly = await blockViewAsWrite();
+  if (readOnly) return { ok: false, error: readOnly };
   const profile = await requireProfile();
   if (!canManage(profile)) return { ok: false, error: 'Only the treasurer and admins can edit the family tree.' };
   const supabase = await createClient();

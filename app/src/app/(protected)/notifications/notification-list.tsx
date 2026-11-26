@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useTransition } from 'react';
+import { useViewAsReadOnly } from '@/components/view-as-context';
 import { markNotificationRead } from '@/app/actions/notifications';
 import type { AppNotification } from '@/lib/session';
 
@@ -12,6 +13,7 @@ const KIND_ICON: Record<AppNotification['kind'], string> = {
 };
 
 export function NotificationList({ items }: { items: AppNotification[] }) {
+  const readOnly = useViewAsReadOnly();
   const [isPending, start] = useTransition();
 
   return (
@@ -26,6 +28,7 @@ export function NotificationList({ items }: { items: AppNotification[] }) {
                 <span className="block text-xs text-stone-500 line-clamp-2 mt-0.5">{n.body}</span>
               )}
             </span>
+            {!readOnly && (
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -33,10 +36,11 @@ export function NotificationList({ items }: { items: AppNotification[] }) {
               }}
               disabled={isPending}
               aria-label="Dismiss reminder"
-              className="shrink-0 h-7 w-7 rounded-full bg-stone-100 text-stone-500 text-xs font-bold hover:bg-stone-200"
+              className="shrink-0 h-11 w-11 rounded-full bg-stone-100 text-stone-500 text-xs font-bold hover:bg-stone-200"
             >
               ✕
             </button>
+            )}
           </>
         );
         return n.link ? (

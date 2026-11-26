@@ -25,8 +25,8 @@ export async function previewRoster(
   _prev: { error?: string } | null,
   formData: FormData,
 ): Promise<{ error?: string; preview?: RosterPreview }> {
-  const ctx = await requireAdminCtx();
-  if (!ctx) return { error: 'Only an admin can import members.' };
+  const ctx = await requireAdminCtx('Only an admin can import members.');
+  if (!ctx.ok) return { error: ctx.error };
 
   const text = String(formData.get('sheet') ?? '');
   const parsed = parseRoster(text);
@@ -77,8 +77,8 @@ export async function previewRoster(
  * Idempotent-ish: safe to re-run after fixing the sheet.
  */
 export async function importRoster(rows: ParsedRosterRow[], branchId: string | null, role: FamilyRole): Promise<{ created: number; skipped: number; errors: string[] }> {
-  const ctx = await requireAdminCtx();
-  if (!ctx) return { created: 0, skipped: 0, errors: ['Only an admin can import members.'] };
+  const ctx = await requireAdminCtx('Only an admin can import members.');
+  if (!ctx.ok) return { created: 0, skipped: 0, errors: [ctx.error] };
   if (!['member', 'treasurer', 'admin'].includes(role)) {
     return { created: 0, skipped: 0, errors: ['Invalid default role for import.'] };
   }
@@ -187,8 +187,8 @@ export async function importRosterAction(
   _prev: { error?: string } | null,
   formData: FormData,
 ): Promise<void> {
-  const ctx = await requireAdminCtx();
-  if (!ctx) redirect('/members');
+  const ctx = await requireAdminCtx('Only an admin can import members.');
+  if (!ctx.ok) redirect(`/members?error=${encodeURIComponent(ctx.error)}`);
   let rows: ParsedRosterRow[] = [];
   try {
     rows = JSON.parse(String(formData.get('rows_json') ?? '[]'));

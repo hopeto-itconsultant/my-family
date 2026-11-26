@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { openPreview, VIEW_AS_COOKIE } from '@/lib/view-as-cookie';
+import { previewBlocksMutation } from '@/lib/view-as-policy';
 
 /**
  * Refreshes the Supabase session cookie on every request and enforces the
@@ -38,13 +40,38 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path.startsWith('/login') || path.startsWith('/auth');
 
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const rawPreview = request.cookies.get(VIEW_AS_COOKIE)?.value;
+  const seal = secret && rawPreview ? await openPreview(rawPreview, secret) : null;
+  if (
+    previewBlocksMutation({
+      method: request.method,
+      pathname: path,
+      actorId: user?.id ?? null,
+      seal,
+      now: Date.now(),
+    })
+  ) {
+    const denied = new NextResponse(
+      'This preview is read-only. Use Exit to return to your own account.',
+      { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } },
+    );
+    response.cookies.getAll().forEach((cookie) => denied.cookies.set(cookie));
+    return denied;
+  }
+
   if (!user && !isAuthPage) {
     const login = new URL('/login', request.url);
     login.searchParams.set('next', path);
-    return NextResponse.redirect(login);
+    const redirect = NextResponse.redirect(login);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    if (rawPreview) redirect.cookies.set(VIEW_AS_COOKIE, '', { path: '/', maxAge: 0 });
+    return redirect;
   }
   if (user && path === '/login') {
-    return NextResponse.redirect(new URL('/', request.url));
+    const home = NextResponse.redirect(new URL('/', request.url));
+    response.cookies.getAll().forEach((cookie) => home.cookies.set(cookie));
+    return home;
   }
   return response;
 }
