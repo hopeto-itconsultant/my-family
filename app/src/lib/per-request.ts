@@ -41,6 +41,8 @@ export const getRelationsOnce = reactCache(async (): Promise<FamilyRelation[]> =
   return data as FamilyRelation[];
 });
 
+const EVENT_COLUMNS = 'id, kind, title, occurs_on, member_id, branch_id, venue, notes';
+
 export const getUpcomingEventsOnce = reactCache(
   async (days = 45): Promise<FamilyEvent[]> => {
     const supabase = await createClient();
@@ -52,7 +54,7 @@ export const getUpcomingEventsOnce = reactCache(
     })();
     const { data, error } = await supabase
       .from('events')
-      .select('id, kind, title, occurs_on, member_id, branch_id, venue, notes')
+      .select(EVENT_COLUMNS)
       .gte('occurs_on', today)
       .lte('occurs_on', until)
       .order('occurs_on');
@@ -60,3 +62,19 @@ export const getUpcomingEventsOnce = reactCache(
     return data as FamilyEvent[];
   },
 );
+
+/**
+ * Every event the member can read (RLS `events_read`). Same columns as the
+ * upcoming window. The calendar needs the full set because birthdays and
+ * anniversaries store only the next occurrence's year — the month view
+ * projects that month/day onto the year on screen.
+ */
+export const getEventsOnce = reactCache(async (): Promise<FamilyEvent[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('events')
+    .select(EVENT_COLUMNS)
+    .order('occurs_on');
+  if (error || !data) return [];
+  return data as FamilyEvent[];
+});
