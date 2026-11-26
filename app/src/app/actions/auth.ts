@@ -3,23 +3,25 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone, tenDigits } from '@/lib/phone';
-
-/** Map Supabase auth errors to family-friendly messages (never leak account existence). */
-function friendlyAuthError(message: string): string {
-  const m = message.toLowerCase();
-  if (m.includes('invalid login credentials')) return 'Mobile number or password is incorrect.';
-  if (m.includes('email not confirmed')) return 'Your account is not activated yet — ask an admin.';
-  if (m.includes('rate limit')) return 'Too many attempts. Please wait a minute and try again.';
-  return message;
-}
+import {
+  attemptPhonePasswordSignIn,
+  friendlyAuthError,
+  PHONE_SIGN_IN_UNAVAILABLE,
+  serviceRolePhoneLookup,
+  type PhoneDirectory,
+} from '@/lib/phone-login';
 
 /**
  * Sign in with a registered mobile number + password.
- * Supabase requires an email on every user, so we resolve the phone to its
- * private shadow email (<91…>@phone.invalid) via the DB helper from migration
- * 0007. Unknown phones resolve to a constant miss value, which produces the
- * same generic error as a wrong password — no member enumeration.
+ *
+ * The service-role client maps profiles.phone_normalized to auth.users.email
+ * (a real address or an OFH-…@phone.invalid shadow). That address is used only
+ * for this request's signInWithPassword call and is never sent back to the
+ * browser. Unknown numbers sign in against a dummy address so the error matches
+ * a wrong password. Migration 0018 drops the old anon RPC that could not see
+ * real emails and that anon could not execute.
  */
 export async function signInWithPhone(formData: FormData) {
   const raw = String(formData.get('phone') ?? '').trim();
@@ -32,17 +34,30 @@ export async function signInWithPhone(formData: FormData) {
   const normalized = normalizePhone(raw)!;
 
   const supabase = await createClient();
-  const { data, error: rpcError } = await supabase.rpc('shadow_email_for_phone', { p: normalized });
-  if (rpcError || !data) {
-    redirect(`/login?error=${encodeURIComponent('Sign-in service unavailable. Try again shortly.')}`);
+  // redirect() throws, so it stays outside this try (Next.js server functions).
+  let lookup;
+  let lookupUnavailable = false;
+  try {
+    // Cast: SupabaseClient's overloaded builders are the same calls PhoneDirectory names.
+    lookup = serviceRolePhoneLookup(createAdminClient() as unknown as PhoneDirectory);
+  } catch {
+    lookupUnavailable = true;
+  }
+  if (lookupUnavailable || !lookup) {
+    redirect(`/login?error=${encodeURIComponent(PHONE_SIGN_IN_UNAVAILABLE)}`);
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email: data as string,
+  const result = await attemptPhonePasswordSignIn(
+    lookup,
+    async (email, pw) => {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      return error ? { message: error.message } : null;
+    },
+    normalized,
     password,
-  });
-  if (error) {
-    redirect(`/login?error=${encodeURIComponent(friendlyAuthError(error.message))}`);
+  );
+  if (!result.ok) {
+    redirect(`/login?error=${encodeURIComponent(result.error)}`);
   }
   redirect(next);
 }
