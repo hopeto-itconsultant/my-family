@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/session';
+import { canWriteFund, FUND_WRITE_DENIED } from '@/lib/fund-access';
 import { parseRupeesToPaise } from '@/lib/money';
 import type { AuditRow, Contribution, Expense, PaymentMethod } from '@/lib/types';
 
@@ -96,12 +97,11 @@ export async function getReceiptUrl(path: string): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Treasurer-only write flows — ALWAYS go through the guarded DB functions.
-// Migration 0008 makes the TREASURER the single person who records fund
-// entries; every other role is view-only (RLS refuses their writes, and the
-// SECURITY DEFINER functions re-check the role inside Postgres anyway).
+// Treasurer or admin write flows. Plain members are view-only: these actions
+// reject them, and migration 0017's RLS / can_write_fund() reject a direct
+// API call as well. Reads above stay open to every signed-in member.
 // ---------------------------------------------------------------------------
-/** Treasurer records a cash / UPI-online payment manually → pending_verification. */
+/** Treasurer or admin records a cash / UPI-online payment manually → pending_verification. */
 export async function recordPayment(input: {
   memberId: string;
   amountRupees: string;
@@ -110,7 +110,7 @@ export async function recordPayment(input: {
   note: string;
 }): Promise<ActionResult> {
   const profile = await requireProfile();
-  if (profile.role !== 'treasurer') return { ok: false, error: 'Only the treasurer can record fund entries.' };
+  if (!canWriteFund(profile.role)) return { ok: false, error: FUND_WRITE_DENIED };
   const amount = parseRupeesToPaise(input.amountRupees);
   if (amount === null) return { ok: false, error: 'Enter a valid amount above ₹0.' };
   if (input.monthRef && !/^\d{4}-\d{2}$/.test(input.monthRef))
@@ -139,7 +139,7 @@ export async function recordPayment(input: {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function friendlyError(msg: string): string | null {
-  if (/only the treasurer/i.test(msg)) return 'Only the treasurer can do this.';
+  if (/only (the treasurer|a treasurer or an admin)/i.test(msg)) return FUND_WRITE_DENIED;
   if (/positive/.test(msg)) return 'Amount must be above ₹0.';
   return null;
 }
@@ -149,7 +149,7 @@ function friendlyError(msg: string): string | null {
 // ---------------------------------------------------------------------------
 async function rpc(name: string, args: Record<string, unknown>): Promise<ActionResult> {
   const profile = await requireProfile();
-  if (profile.role !== 'treasurer') return { ok: false, error: 'Only the treasurer can do this.' };
+  if (!canWriteFund(profile.role)) return { ok: false, error: FUND_WRITE_DENIED };
   const supabase = await createClient();
   const { error } = await supabase.rpc(name, args);
   if (error) return { ok: false, error: friendlyError(error.message ?? '') ?? error.message.replace(/^.*?: /, '') };
@@ -191,6 +191,7 @@ export async function payExpense(input: {
   existingReceiptPath?: string | null;
 }): Promise<ActionResult> {
   const profile = await requireProfile();
+  if (!canWriteFund(profile.role)) return { ok: false, error: FUND_WRITE_DENIED };
   if (input.bankRef.trim().length < 3)
     return { ok: false, error: 'Bank reference is required.' };
 
@@ -205,7 +206,7 @@ export async function payExpense(input: {
     const { error: upErr } = await supabase.storage
       .from('receipts')
       .upload(receiptPath, input.receiptFile, { contentType: input.receiptFile.type });
-    if (upErr) return { ok: false, error: 'Receipt upload failed (treasurer only).' };
+    if (upErr) return { ok: false, error: 'Receipt upload failed. Only a treasurer or an admin can upload receipts.' };
   }
   if (!receiptPath) return { ok: false, error: 'A receipt is required before paying.' };
 
@@ -216,14 +217,14 @@ export async function payExpense(input: {
   });
 }
 
-/** The treasurer records an expense (manual entry only). Lands as 'submitted'. */
+/** Treasurer or admin records an expense (manual entry only). Lands as 'submitted'. */
 export async function submitExpenseRequest(input: {
   title: string;
   purpose: string;
   amountRupees: string;
 }): Promise<ActionResult> {
   const profile = await requireProfile();
-  if (profile.role !== 'treasurer') return { ok: false, error: 'Only the treasurer can record expenses.' };
+  if (!canWriteFund(profile.role)) return { ok: false, error: FUND_WRITE_DENIED };
   if (input.title.trim().length < 2) return { ok: false, error: 'Give the expense a title.' };
   const amount = parseRupeesToPaise(input.amountRupees);
   if (amount === null) return { ok: false, error: 'Enter a valid amount.' };

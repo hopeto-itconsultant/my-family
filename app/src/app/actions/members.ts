@@ -60,8 +60,9 @@ function readLifeFields(formData: FormData): {
   return { ...blank, nicknames: nicknames.length ? nicknames : null };
 }
 
-// Coordinator was merged into Treasurer (migration 0015): one steward role
-// manages the family app AND records all Mission Fund entries manually.
+// Coordinator was merged into Treasurer (migration 0015). Admins assign or
+// remove Treasurer here (profiles.role). Treasurers and admins may change
+// Mission Fund entries; every other role is view-only (migration 0017).
 const ASSIGNABLE_ROLES: FamilyRole[] = ['member', 'treasurer', 'admin'];
 
 function validDate(s: string): string | null {

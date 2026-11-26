@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { requireProfile, getDirectory, canManage } from '@/lib/session';
-import { isFinanceRole } from '@/lib/types';
+import { requireProfile, getDirectory } from '@/lib/session';
+import { canWriteFund } from '@/lib/fund-access';
 import { formatPaise } from '@/lib/money';
 import {
   getFundSummary, getContributions, getExpenses, getBranchCollection, getAuditTrail, getReceiptUrl,
@@ -54,20 +54,20 @@ function auditLabel(a: AuditRow): string {
 
 export default async function FundPage() {
   const profile = await requireProfile();
-  const isTreasurer = isFinanceRole(profile.role);
+  const canWrite = canWriteFund(profile.role);
 
   const monthRef = new Date().toISOString().slice(0, 7);
   const [directory, summary, contributions, expenses, branchRows, audit] = await Promise.all([
     getDirectory(), getFundSummary(), getContributions(), getExpenses(),
-    getBranchCollection(monthRef), isTreasurer || canManage(profile) ? getAuditTrail() : Promise.resolve([]),
+    getBranchCollection(monthRef), canWrite ? getAuditTrail() : Promise.resolve([]),
   ]);
 
   const names: Record<string, string> = {};
   for (const p of directory as ProfileWithBranch[]) names[p.id] = p.full_name;
 
-  // Receipt links only minted for treasurers (storage RLS would refuse others anyway).
+  // Receipt links only minted for treasurer/admin (storage RLS would refuse others anyway).
   const receiptUrls: Record<string, string | null> = {};
-  if (isTreasurer) {
+  if (canWrite) {
     for (const e of expenses.filter((x) => x.receipt_path)) {
       receiptUrls[e.id] = await getReceiptUrl(e.receipt_path!);
     }
@@ -102,16 +102,14 @@ export default async function FundPage() {
         </p>
       </section>
 
-      {/* Primary actions — only the treasurer records entries; everyone else views */}
-      {isTreasurer ? (
+      {/* Primary actions — treasurer and admin record entries; everyone else views */}
+      {canWrite ? (
         <div className="space-y-3">
-          <RecordPaymentSheet directory={directory.filter((d) => d.role !== 'treasurer')} />
+          <RecordPaymentSheet directory={directory} />
         </div>
       ) : (
         <p className="text-xs rounded-xl bg-stone-100 text-stone-600 px-4 py-3">
-          👀 You can view every fund record here. All entries are recorded manually by the family
-          treasurer — payments made to the treasurer (cash or UPI) appear here as “awaiting
-          verification” until confirmed received.
+          View only. Treasurers and admins record, edit, and remove fund entries.
         </p>
       )}
 
@@ -135,7 +133,7 @@ export default async function FundPage() {
       )}
 
       {/* Treasurer queues */}
-      {isTreasurer && (queue.length > 0 || openExpenses.length > 0) && (
+      {canWrite && (queue.length > 0 || openExpenses.length > 0) && (
         <section className="space-y-3">
           <h2 className="font-semibold">🧑‍💼 Treasurer queue</h2>
           {queue.length > 0 && (
@@ -193,7 +191,7 @@ export default async function FundPage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Family ledger</h2>
-          {isTreasurer && <ExpenseRequestSheet />}
+          {canWrite && <ExpenseRequestSheet />}
         </div>
         {ledger.length === 0 && (
           <p className="text-sm text-stone-500 rounded-xl bg-white ring-1 ring-stone-200 p-4">
@@ -225,7 +223,7 @@ export default async function FundPage() {
               <p className="text-xs text-stone-500">
                 requested by {names[e.requested_by] ?? 'member'}{e.bank_ref ? ` · ref ${e.bank_ref}` : ''}{e.reject_reason ? ` · ${e.reject_reason}` : ''}
               </p>
-              {isTreasurer && <ExpenseControls e={e} names={names} receiptUrl={receiptUrls[e.id] ?? null} />}
+              {canWrite && <ExpenseControls e={e} names={names} receiptUrl={receiptUrls[e.id] ?? null} />}
             </div>
           ))}
         </section>
@@ -247,7 +245,7 @@ export default async function FundPage() {
       )}
 
       <p className="text-[11px] text-stone-400">
-        Only the treasurer records entries (manual cash/UPI-online entries only). Balance rule: verified contributions − paid expenses, computed in PostgreSQL on every visit.
+        Only treasurers and admins record, edit, or remove entries (manual cash/UPI-online entries only). Balance rule: verified contributions − paid expenses, computed in PostgreSQL on every visit.
         Corrections are reversals with reasons — history is never rewritten.{' '}
         <Link href="/setup" className="underline">Setup notes</Link>
       </p>

@@ -1,4 +1,6 @@
 // Shared domain types — mirror of the Postgres schema (supabase/migrations).
+import { canWriteFund } from './fund-access';
+
 export type FamilyRole = 'member' | 'treasurer' | 'admin';
 
 export interface Branch {
@@ -241,6 +243,7 @@ export function isLeader(role: FamilyRole): boolean {
   return role === 'treasurer' || role === 'admin';
 }
 
+/** Same gate as canWriteFund() — treasurer or admin may change Mission Fund rows. */
 export function isFinanceRole(role: FamilyRole): boolean {
-  return role === 'treasurer' || role === 'admin';
+  return canWriteFund(role);
 }

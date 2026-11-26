@@ -54,6 +54,13 @@ export default async function MembersPage() {
         ))}
       </ul>
 
+      {isAdmin && (
+        <p className="text-xs text-stone-500">
+          Assign a treasurer from Edit: set Role to Treasurer. Set it back to Member to unassign.
+          Only treasurers and admins can change the Mission Fund. Everyone else can view it.
+        </p>
+      )}
+
       <p className="text-xs text-stone-500">
         New members sign in with their mobile number and the temporary password
         you set. Ask them to change it from “Me” after first login.
