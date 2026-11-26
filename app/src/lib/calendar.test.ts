@@ -7,6 +7,7 @@ import {
   monthKey,
   parseMonthParam,
   shiftMonth,
+  shortEventLabel,
 } from './calendar';
 import type { FamilyEvent } from './types';
 
@@ -23,6 +24,13 @@ function event(partial: Partial<FamilyEvent> & Pick<FamilyEvent, 'id' | 'kind' |
 function day(calendar: ReturnType<typeof buildCalendarMonth>, iso: string) {
   return calendar.weeks.flat().find((d) => d.iso === iso);
 }
+
+test('phone cell labels use a first name, or the title without the kind suffix', () => {
+  assert.equal(shortEventLabel({ title: 'Lakshmi — Birthday', who: 'Lakshmi Iyer' }), 'Lakshmi');
+  assert.equal(shortEventLabel({ title: 'Akito — Birthday', who: 'Akito' }), 'Akito');
+  assert.equal(shortEventLabel({ title: 'Family lunch', who: null }), 'Family lunch');
+  assert.equal(shortEventLabel({ title: 'Ravi & Anitha — Anniversary', who: '  ' }), 'Ravi & Anitha');
+});
 
 test('IST today is the Kolkata calendar date, including late UTC evening', () => {
   assert.equal(istToday(new Date('2026-11-26T18:00:00Z')).iso, '2026-11-26');

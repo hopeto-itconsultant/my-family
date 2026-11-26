@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { formatLongDate } from '@/lib/calendar';
+import { formatLongDate, shortEventLabel } from '@/lib/calendar';
 import type { EventKind } from '@/lib/types';
 import { EventCard, KIND_META } from './event-card';
 
@@ -24,6 +24,7 @@ export interface CalendarDayItem {
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] as const;
 const DESKTOP_VISIBLE = 2;
+const MOBILE_VISIBLE = 2;
 
 export function EventsCalendar({
   label,
@@ -52,7 +53,8 @@ export function EventsCalendar({
     if (typeof window === 'undefined') return;
     if (!window.matchMedia('(max-width: 767px)').matches) return;
     requestAnimationFrame(() => {
-      document.getElementById('selected-day-events')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const target = document.getElementById(`month-day-${iso}`) ?? document.getElementById('month-events');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
@@ -115,36 +117,35 @@ export function EventsCalendar({
                 aria-label={dayAria(day)}
                 onClick={() => selectDay(day.iso)}
                 className={
-                  'min-w-0 overflow-hidden flex flex-col items-center gap-1 px-0.5 py-1.5 min-h-[3.25rem] md:items-stretch md:gap-0.5 md:p-1.5 md:min-h-[6.75rem] text-left focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset ' +
+                  'min-w-0 overflow-hidden flex flex-col items-stretch gap-0.5 px-0.5 py-1 min-h-[4.25rem] md:gap-0.5 md:p-1.5 md:min-h-[6.75rem] text-left focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset ' +
                   (pressed ? 'focus-visible:ring-white ' : 'focus-visible:ring-teal-800 ') +
                   daySurface(day, pressed)
                 }
               >
                 <span
                   className={
-                    'inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold md:self-start ' +
+                    'inline-flex h-5 w-5 md:h-6 md:w-6 items-center justify-center self-center md:self-start rounded-full text-[11px] md:text-xs font-semibold ' +
                     dayNumberClass(day, pressed)
                   }
                 >
                   {dayNum}
                 </span>
-                <span className="md:hidden flex items-center justify-center gap-0.5 min-h-2">
-                  {day.events.length > 3 ? (
+                <span className="md:hidden flex flex-col gap-px min-w-0 w-full">
+                  {day.events.slice(0, MOBILE_VISIBLE).map((item) => (
                     <span
+                      key={item.id}
                       className={
-                        'text-[10px] font-bold leading-none rounded-full px-1 ' +
-                        (pressed ? 'text-white' : 'text-stone-600')
+                        'block min-w-0 truncate text-[11px] leading-[14px] font-medium ' +
+                        (pressed ? 'text-white' : mobileLabelClass(item.kind, day))
                       }
                     >
-                      {day.events.length}
+                      {KIND_META[item.kind].icon} {shortEventLabel(item)}
                     </span>
-                  ) : (
-                    day.events.map((item) => (
-                      <span
-                        key={item.id}
-                        className={'h-1.5 w-1.5 rounded-full ' + (pressed ? 'bg-white' : KIND_META[item.kind].dot)}
-                      />
-                    ))
+                  ))}
+                  {day.events.length > MOBILE_VISIBLE && (
+                    <span className={'text-[11px] font-semibold leading-[14px] ' + (pressed ? 'text-white' : 'text-stone-500')}>
+                      +{day.events.length - MOBILE_VISIBLE}
+                    </span>
                   )}
                 </span>
                 <span className="hidden md:flex flex-col gap-0.5 min-w-0">
@@ -171,17 +172,10 @@ export function EventsCalendar({
         </div>
       </div>
 
-      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-stone-500 md:hidden" aria-hidden>
-        {(Object.keys(KIND_META) as EventKind[]).map((kind) => (
-          <li key={kind} className="inline-flex items-center gap-1">
-            <span className={'h-1.5 w-1.5 rounded-full ' + KIND_META[kind].dot} />
-            {KIND_META[kind].label}
-          </li>
-        ))}
-      </ul>
+      <MonthEventList todayIso={todayIso} selectedIso={selectedDay?.iso ?? null} days={flat} />
 
       {selectedDay && (
-        <section id="selected-day-events" className="scroll-mt-20 space-y-2" aria-live="polite">
+        <section id="selected-day-events" className="hidden md:block scroll-mt-20 space-y-2" aria-live="polite">
           <h3 className="text-sm font-semibold text-stone-800">
             {formatLongDate(selectedDay.iso)}
             {selectedDay.isToday && <span className="ml-2 text-teal-700 font-semibold">Today</span>}
@@ -210,6 +204,70 @@ export function EventsCalendar({
   );
 }
 
+function MonthEventList({
+  todayIso,
+  selectedIso,
+  days,
+}: {
+  todayIso: string;
+  selectedIso: string | null;
+  days: CalendarDayItem[];
+}) {
+  const groups = days.filter((day) => day.inMonth && day.events.length > 0);
+  const selected = days.find((day) => day.iso === selectedIso);
+  const selectedEmpty = Boolean(selected && selected.inMonth && selected.events.length === 0);
+
+  return (
+    <section id="month-events" className="md:hidden scroll-mt-20 space-y-3" aria-label="Events this month">
+      <h3 className="text-sm font-semibold text-stone-800">This month</h3>
+      {groups.length === 0 ? (
+        <p className="rounded-xl bg-white text-stone-500 ring-1 ring-stone-200 p-4 text-sm text-center">
+          No events this month.
+        </p>
+      ) : (
+        groups.map((day) => {
+          const tone = dayTone(day.iso, todayIso);
+          const highlighted = day.iso === selectedIso;
+          return (
+            <section
+              key={day.iso}
+              id={`month-day-${day.iso}`}
+              className={
+                'scroll-mt-20 space-y-2 rounded-xl p-2 ' +
+                (tone === 'today' ? 'bg-teal-50 ' : tone === 'upcoming' ? 'bg-white ' : '') +
+                (highlighted ? 'ring-2 ring-teal-700' : tone === 'upcoming' ? 'ring-1 ring-stone-200' : '')
+              }
+            >
+              <h4 className={'text-sm font-semibold ' + (tone === 'past' ? 'text-stone-500' : 'text-stone-800')}>
+                {formatLongDate(day.iso)}
+                {tone === 'today' && <span className="ml-2 text-teal-700">Today</span>}
+                {tone === 'upcoming' && <span className="ml-2 text-[11px] font-semibold text-amber-800">Upcoming</span>}
+              </h4>
+              <ul className="space-y-2">
+                {day.events.map((item) => (
+                  <li key={item.id}>
+                    <EventCard kind={item.kind} title={item.title} meta={eventMeta(item)} notes={item.notes} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })
+      )}
+      {selected && selectedEmpty && groups.length > 0 && (
+        <p id={`month-day-${selected.iso}`} className="scroll-mt-20 rounded-xl bg-white text-stone-500 ring-1 ring-stone-200 p-4 text-sm text-center">
+          Nothing on {formatLongDate(selected.iso)}.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function dayTone(iso: string, todayIso: string): 'past' | 'today' | 'upcoming' {
+  if (iso === todayIso) return 'today';
+  return iso > todayIso ? 'upcoming' : 'past';
+}
+
 function daySurface(day: CalendarDayItem, pressed: boolean): string {
   if (pressed) return 'bg-teal-700 text-white';
   if (day.isToday) return 'bg-teal-50 text-stone-900';
@@ -222,6 +280,13 @@ function dayNumberClass(day: CalendarDayItem, pressed: boolean): string {
   if (day.isToday) return 'bg-teal-700 text-white';
   if (!day.inMonth) return 'text-stone-400';
   return 'text-stone-800';
+}
+
+function mobileLabelClass(kind: EventKind, day: CalendarDayItem): string {
+  if (!day.inMonth) return 'text-stone-500';
+  if (kind === 'birthday') return 'text-amber-950';
+  if (kind === 'anniversary') return 'text-rose-950';
+  return 'text-teal-900';
 }
 
 function dayAria(day: CalendarDayItem): string {

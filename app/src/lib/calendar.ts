@@ -74,6 +74,21 @@ export function shiftMonth(year: number, month: number, delta: number): YearMont
   return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1 };
 }
 
+/**
+ * Label that fits a phone day cell: the person's first name when we know
+ * who the event is for, otherwise the title without a "— Birthday" suffix.
+ * The cell truncates whatever is still too long.
+ */
+export function shortEventLabel(event: { title: string; who?: string | null }): string {
+  const who = event.who?.trim();
+  if (who) {
+    const first = who.split(/\s+/)[0];
+    if (first) return first;
+  }
+  const stripped = event.title.split(/\s+[—–]\s+/)[0]?.trim();
+  return stripped || event.title.trim();
+}
+
 export function formatLongDate(iso: string): string {
   const parsed = parseIsoDate(iso);
   if (!parsed) return iso;
