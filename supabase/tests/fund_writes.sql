@@ -12,10 +12,27 @@
 -- ============================================================================
 begin;
 
-insert into auth.users (id, email, raw_user_meta_data) values
-  ('11111111-1111-4111-8111-111111111111', 'fund-admin@test.invalid', '{"full_name":"Fund Admin"}'),
-  ('22222222-2222-4222-8222-222222222222', 'fund-treasurer@test.invalid', '{"full_name":"Fund Treasurer"}'),
-  ('33333333-3333-4333-8333-333333333333', 'fund-member@test.invalid', '{"full_name":"Fund Member"}');
+-- Empty token strings and an email identity so these rows are valid GoTrue
+-- users (NULL confirmation_token / a missing identities row breaks password login).
+insert into auth.users (
+  id, email, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
+) values
+  ('11111111-1111-4111-8111-111111111111', 'fund-admin@test.invalid', '{"full_name":"Fund Admin"}', '', '', '', '', '', '', '', ''),
+  ('22222222-2222-4222-8222-222222222222', 'fund-treasurer@test.invalid', '{"full_name":"Fund Treasurer"}', '', '', '', '', '', '', '', ''),
+  ('33333333-3333-4333-8333-333333333333', 'fund-member@test.invalid', '{"full_name":"Fund Member"}', '', '', '', '', '', '', '', '');
+
+insert into auth.identities (id, user_id, identity_data, provider, provider_id, created_at, updated_at)
+select gen_random_uuid(), u.id,
+       jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
+       'email', u.id::text, now(), now()
+  from auth.users u
+ where u.email in (
+   'fund-admin@test.invalid',
+   'fund-treasurer@test.invalid',
+   'fund-member@test.invalid'
+ );
 
 -- Signup trigger made the first user admin and the others members.
 -- The role-change trigger requires a treasurer/admin JWT (or, after 0017, no

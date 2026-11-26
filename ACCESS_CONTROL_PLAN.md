@@ -19,7 +19,7 @@ Awaiting approval before Phase 2 (which introduces additive migrations).
 | Storage | Private buckets `family-photos`, `receipts`; signed URLs minted server-side after an RLS pass on metadata rows | Metadata rows will inherit resource ACLs; bucket policies unchanged |
 
 ### Application (`app/src`)
-- Next.js App Router, server components + server actions (`src/app/actions/*`), `@supabase/ssr` clients; service-role client (`lib/supabase/admin.ts`) used **only** for account creation.
+- Next.js App Router, server components + server actions (`src/app/actions/*`), `@supabase/ssr` clients; service-role client (`lib/supabase/admin.ts`) used for account creation and, at phone sign-in, to map `profiles.phone_normalized` to `auth.users.email`. That address stays on the server. No anon RPC returns it.
 - Authorization today is thin and duplicated: `canManage(profile)` in `lib/session.ts` mirrors `is_steward()` SQL; every page/action assumes *global* role + single branch; navigation shell shows all tabs to everyone.
 - Caching: `lib/cached.ts` route-caches directory/branches/tree/events — **must become per-audience once content is scoped**, otherwise user A could be served cached content B shouldn't see.
 - Tests: pure-function node tests (`*.test.ts`: csv, nicknames, phone, roster, tree). There is currently **no DB-integration test harness** (RLS behavior can only be proven against a real Postgres).
