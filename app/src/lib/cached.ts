@@ -2,6 +2,7 @@ import 'server-only';
 import {
   getBranchesOnce,
   getDirectoryOnce,
+  getEventsOnce,
   getRelationsOnce,
   getUpcomingEventsOnce,
 } from '@/lib/per-request';
@@ -20,3 +21,4 @@ export const getCachedDirectory = getDirectoryOnce;
 export const getCachedBranches = getBranchesOnce;
 export const getCachedRelations = getRelationsOnce;
 export const getCachedUpcomingEvents = getUpcomingEventsOnce;
+export const getCachedEvents = getEventsOnce;

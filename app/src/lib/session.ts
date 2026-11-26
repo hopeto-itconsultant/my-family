@@ -1,5 +1,11 @@
 import { redirect } from 'next/navigation';
-import { getCachedDirectory, getCachedBranches, getCachedRelations, getCachedUpcomingEvents } from '@/lib/cached';
+import {
+  getCachedDirectory,
+  getCachedBranches,
+  getCachedEvents,
+  getCachedRelations,
+  getCachedUpcomingEvents,
+} from '@/lib/cached';
 import { createClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/env';
 import type { Branch, FamilyEvent, FamilyRelation, Profile, ProfileWithBranch } from '@/lib/types';
@@ -57,6 +63,11 @@ export async function getRelations(): Promise<FamilyRelation[]> {
 /** Upcoming events window for this member (per-request). */
 export async function getUpcomingEvents(days = 45): Promise<FamilyEvent[]> {
   return getCachedUpcomingEvents(days);
+}
+
+/** All events this member can read (per-request). Used by the month calendar. */
+export async function getEvents(): Promise<FamilyEvent[]> {
+  return getCachedEvents();
 }
 
 /** In-app reminders for the signed-in member (RLS: only own rows are visible). */
