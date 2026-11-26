@@ -9,11 +9,30 @@
 begin;
 
 -- ---- fixtures --------------------------------------------------------------
-insert into auth.users (id, email) values
-  ('11111111-1111-1111-1111-111111111111', 'admin@test.invalid'),
-  ('22222222-2222-2222-2222-222222222222', 'branchA-admin@test.invalid'),
-  ('33333333-3333-3333-3333-333333333333', 'plain@test.invalid'),
-  ('44444444-4444-4444-4444-444444444444', 'twobranch@test.invalid');
+-- Empty token strings and an email identity: GoTrue password login cannot
+-- scan NULL confirmation/recovery/email-change fields, and it expects
+-- provider 'email' with provider_id = the user uuid.
+insert into auth.users (
+  id, email,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
+) values
+  ('11111111-1111-1111-1111-111111111111', 'admin@test.invalid', '', '', '', '', '', '', '', ''),
+  ('22222222-2222-2222-2222-222222222222', 'branchA-admin@test.invalid', '', '', '', '', '', '', '', ''),
+  ('33333333-3333-3333-3333-333333333333', 'plain@test.invalid', '', '', '', '', '', '', '', ''),
+  ('44444444-4444-4444-4444-444444444444', 'twobranch@test.invalid', '', '', '', '', '', '', '', '');
+
+insert into auth.identities (id, user_id, identity_data, provider, provider_id, created_at, updated_at)
+select gen_random_uuid(), u.id,
+       jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
+       'email', u.id::text, now(), now()
+  from auth.users u
+ where u.id in (
+   '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222222',
+   '33333333-3333-3333-3333-333333333333',
+   '44444444-4444-4444-4444-444444444444'
+ );
 
 insert into public.profiles (id, full_name, role) values
   ('11111111-1111-1111-1111-111111111111', 'Global Admin', 'admin'),
